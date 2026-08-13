@@ -1,0 +1,148 @@
+/* ===================================================================
+   Global motion layer — OMS
+   Route transitions, staggered entrances, overlay/dialog motion,
+   micro-interactions. All gated behind prefers-reduced-motion.
+   =================================================================== */
+
+$ease-snap: cubic-bezier(0.16, 1, 0.3, 1);
+$ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+/* ---- Keyframes ---- */
+@keyframes oms-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes oms-fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes oms-fade-down { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: none; } }
+@keyframes oms-slide-left { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+@keyframes oms-slide-in-right { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+@keyframes oms-scale-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: none; } }
+@keyframes oms-pop { 0% { transform: scale(0); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
+@keyframes oms-bell {
+  0%, 70%, 100% { transform: rotate(0); }
+  10% { transform: rotate(16deg); }
+  20% { transform: rotate(-14deg); }
+  30% { transform: rotate(10deg); }
+  40% { transform: rotate(-7deg); }
+  50% { transform: rotate(4deg); }
+}
+@keyframes oms-shimmer { 100% { transform: translateX(100%); } }
+@keyframes oms-spin { to { transform: rotate(360deg); } }
+
+/* ---- Route (view) transitions ---- */
+::view-transition-old(root) { animation: oms-fade 160ms ease both; }
+::view-transition-new(root) { animation: oms-fade-up 320ms #{$ease-snap} both; }
+
+/* ---- Staggered page/grid entrance (plays once per navigation) ---- */
+.oms-page .grid > [class*='col-'] {
+  animation: oms-fade 460ms #{$ease-snap} both;
+}
+@for $i from 1 through 12 {
+  .oms-page .grid > [class*='col-']:nth-child(#{$i}) { animation-delay: #{$i * 0.045}s; }
+}
+
+/* Sidebar nav reveals on mount */
+app-sidebar .nav-section { animation: oms-slide-left 400ms #{$ease-snap} both; }
+@for $i from 1 through 6 {
+  app-sidebar .nav-section:nth-child(#{$i}) { animation-delay: #{0.04 + $i * 0.05}s; }
+}
+
+/* ---- Interactive micro-transitions ---- */
+.crud-icon-act,
+.nav-item,
+.action,
+.feed-item,
+.notif,
+.step,
+.legend-item,
+.tb-btn,
+.icon-btn {
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease,
+    transform 0.18s #{$ease-snap}, box-shadow 0.18s #{$ease-snap};
+}
+
+/* Table row hover lift */
+.p-datatable-tbody > tr {
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.p-datatable-tbody > tr:hover {
+  box-shadow: inset 3px 0 0 var(--p-primary-color);
+}
+
+/* ---- PrimeNG overlay & dialog motion ---- */
+.p-dialog { animation: oms-scale-in 240ms #{$ease-snap} both; }
+.p-dialog-mask.p-overlay-mask { animation: oms-fade 200ms ease both; }
+.p-drawer { animation: oms-slide-in-right 260ms #{$ease-snap} both; }
+
+.p-select-overlay,
+.p-multiselect-overlay,
+.p-popover,
+.p-menu,
+.p-tieredmenu,
+.p-datepicker-panel,
+.p-autocomplete-overlay {
+  animation: oms-fade-down 180ms #{$ease-snap} both;
+  transform-origin: top center;
+}
+
+/* Toast slides in from the right */
+.p-toast-message { animation: oms-slide-in-right 320ms #{$ease-bounce} both; }
+
+/* Confirm popup / dialog buttons subtle */
+.p-confirmdialog { animation: oms-scale-in 220ms #{$ease-snap} both; }
+
+/* ---- Notification bell + badge flourish ---- */
+/* Wiggle the bell while there are unread notifications */
+.notif-btn:has(> span) i.pi-bell {
+  animation: oms-bell 2.4s ease-in-out 1s infinite;
+  transform-origin: 50% 20%;
+}
+/* Pop the unread count badge in */
+.notif-btn > span { animation: oms-pop 340ms #{$ease-bounce} both; }
+
+/* ---- Organogram node reveal ---- */
+.chart .node { animation: oms-scale-in 260ms #{$ease-snap} both; }
+
+/* ---- Empty states gently fade in ---- */
+.crud-empty,
+.empty-state,
+.empty-feed,
+.empty-donut-wrap,
+.org-empty {
+  animation: oms-fade 500ms ease both;
+}
+
+/* ---- Skeleton shimmer utility ---- */
+.oms-skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--p-content-border-color, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+}
+.oms-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  animation: oms-shimmer 1.4s infinite;
+}
+
+/* Loading spinner helper */
+.oms-spin { animation: oms-spin 0.9s linear infinite; }
+
+/* ===================================================================
+   Accessibility: honour reduced-motion — disable all of the above
+   =================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

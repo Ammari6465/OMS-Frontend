@@ -1,0 +1,588 @@
+/* ===================================================================
+   Organogram Management System — shared visual system
+   =================================================================== */
+@import 'primeicons/primeicons.css';
+@import 'primeflex/primeflex.css';
+
+:root {
+  --oms-topbar-height: 64px;
+  --oms-sidebar-width: 260px;
+  --oms-sidebar-width-collapsed: 74px;
+  --oms-transition: 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-snap: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --oms-page-bg: #f4f7fb;
+  --oms-shell-bg: #eef3f9;
+  --oms-sidebar-bg: #ffffff;
+  --oms-topbar-bg: rgba(255, 255, 255, 0.88);
+  --oms-input-bg: #ffffff;
+  --oms-subtle-bg: #f7f9fc;
+  --oms-hover-bg: #eef6ff;
+  --oms-elevated-bg: #ffffff;
+  --oms-overlay-bg: rgba(15, 23, 42, 0.5);
+  --oms-scroll-thumb: #b5c1d1;
+  --p-content-background: #ffffff;
+  --p-content-border-color: #dce4ee;
+  --p-text-color: #162238;
+  --p-text-muted-color: #64748b;
+  --oms-card-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  --oms-card-hover-shadow: 0 14px 32px rgba(15, 23, 42, 0.1);
+  --oms-focus-ring: 0 0 0 3px rgba(15, 139, 253, 0.18);
+  --oms-radius: 14px;
+
+  /* Secondary, Hover & Accent Color: #0f8bfd */
+  --oms-secondary: #0f8bfd;
+  --oms-hover: #0f8bfd;
+  --p-primary-color: #0f8bfd;
+  --p-primary-hover-color: #0077e6;
+
+  /* Brand & Accent Tokens */
+  --brand-50:   #eff6ff;
+  --brand-100:  #dbeafe;
+  --brand-200:  #bfdbfe;
+  --brand-400:  #60a5fa;
+  --brand-500:  #0f8bfd;
+  --brand-600:  #0276e2;
+  --brand-700:  #0260bb;
+
+  --accent-400: #a78bfa;
+  --accent-500: #8b5cf6;
+  --accent-600: #7c3aed;
+
+  --emerald-400: #34d399;
+  --emerald-500: #10b981;
+  --emerald-600: #059669;
+
+  --amber-400:  #fbbf24;
+  --amber-500:  #f59e0b;
+  --amber-600:  #d97706;
+
+  --rose-400:  #f87171;
+  --rose-500:  #ef4444;
+  --rose-600:  #dc2626;
+}
+
+:root[data-theme='dark'],
+.app-dark {
+  color-scheme: dark;
+  --oms-page-bg: #0b1120;
+  --oms-shell-bg: #080d18;
+  --oms-sidebar-bg: #0d1424;
+  --oms-topbar-bg: rgba(13, 20, 36, 0.88);
+  --oms-input-bg: #111b2e;
+  --oms-subtle-bg: #10192a;
+  --oms-hover-bg: rgba(15, 139, 253, 0.1);
+  --oms-elevated-bg: #131d30;
+  --oms-overlay-bg: rgba(3, 7, 18, 0.72);
+  --oms-scroll-thumb: #334155;
+  --p-content-background: #111a2b;
+  --p-content-border-color: #253149;
+  --p-text-color: #edf3fc;
+  --p-text-muted-color: #91a0b7;
+  --oms-card-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  --oms-card-hover-shadow: 0 16px 36px rgba(0, 0, 0, 0.3);
+  --p-primary-color: #0f8bfd;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --p-primary-color: #0f8bfd;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--oms-page-bg) !important;
+}
+
+body {
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background: var(--oms-page-bg) !important;
+  color: var(--p-text-color);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 {
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--p-text-color);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+  transition: color 150ms var(--ease-snap);
+}
+a:hover {
+  color: var(--p-primary-color);
+}
+
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--p-primary-color);
+  outline-offset: 2px;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--oms-scroll-thumb);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #0f8bfd;
+}
+
+/* Page scaffold */
+.oms-page {
+  padding: clamp(1rem, 2vw, 2rem);
+  max-width: 1500px;
+  margin: 0 auto;
+  animation: page-enter 400ms var(--ease-snap) both;
+}
+
+.oms-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+.oms-page-title {
+  font-size: clamp(1.45rem, 2vw, 1.8rem);
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: -0.03em;
+  color: var(--p-text-color);
+}
+.oms-page-subtitle {
+  margin: 0.3rem 0 0;
+  color: var(--p-text-muted-color, #a0a7b5);
+  font-size: 0.9rem;
+}
+
+/* Surface cards with modern elevation & smooth hover */
+.oms-surface-card {
+  background: var(--p-content-background);
+  border: 1px solid var(--p-content-border-color);
+  border-radius: var(--oms-radius);
+  box-shadow: var(--oms-card-shadow);
+  transition: transform var(--oms-transition), box-shadow var(--oms-transition), border-color var(--oms-transition);
+}
+.oms-surface-card:hover {
+  border-color: color-mix(in srgb, var(--p-primary-color) 45%, var(--p-content-border-color));
+  box-shadow: var(--oms-card-hover-shadow);
+}
+
+/* PrimeNG Overrides & Enterprise Polish */
+.p-card {
+  background: var(--p-content-background) !important;
+  color: var(--p-text-color) !important;
+  border: 1px solid var(--p-content-border-color) !important;
+  border-radius: var(--oms-radius) !important;
+  box-shadow: var(--oms-card-shadow) !important;
+  transition: transform var(--oms-transition), box-shadow var(--oms-transition), border-color var(--oms-transition);
+}
+.p-card:hover {
+  border-color: color-mix(in srgb, var(--p-primary-color) 40%, var(--p-content-border-color)) !important;
+  box-shadow: var(--oms-card-hover-shadow) !important;
+}
+.p-card .p-card-body {
+  padding: 1.4rem 1.5rem;
+}
+.p-card .p-card-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.p-button {
+  font-weight: 600 !important;
+  border-radius: 10px !important;
+  background-color: var(--p-primary-color) !important;
+  border-color: var(--p-primary-color) !important;
+  color: #ffffff !important;
+  transition: all 200ms var(--ease-snap) !important;
+}
+.p-button:hover {
+  background-color: #0077e6 !important;
+  border-color: #0077e6 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px rgba(15, 139, 253, 0.28) !important;
+}
+.p-button.p-button-secondary {
+  background: var(--oms-subtle-bg) !important;
+  border-color: var(--p-content-border-color) !important;
+  color: var(--p-text-color) !important;
+}
+.p-button.p-button-danger {
+  background: var(--rose-500) !important;
+  border-color: var(--rose-500) !important;
+}
+.p-button.p-button-text {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: var(--p-primary-color) !important;
+  box-shadow: none !important;
+}
+.p-button.p-button-outlined {
+  background-color: transparent !important;
+  color: #0f8bfd !important;
+  border-color: rgba(15, 139, 253, 0.4) !important;
+}
+.p-button.p-button-outlined:hover {
+  background-color: rgba(15, 139, 253, 0.14) !important;
+  border-color: #0f8bfd !important;
+  color: var(--p-primary-color) !important;
+}
+
+.sunrich-btn {
+  background: linear-gradient(135deg, #0f8bfd, #026ecc) !important;
+  border: none !important;
+  box-shadow: 0 4px 14px rgba(15, 139, 253, 0.35) !important;
+}
+.sunrich-btn:hover {
+  background: linear-gradient(135deg, #0276e2, #0257a3) !important;
+  box-shadow: 0 6px 20px rgba(15, 139, 253, 0.5) !important;
+}
+
+.p-inputtext,
+input[type="text"],
+input[type="password"],
+input[type="email"] {
+  background: var(--oms-input-bg) !important;
+  border: 1px solid var(--p-content-border-color) !important;
+  border-radius: 10px !important;
+  color: var(--p-text-color) !important;
+  padding: 0.6rem 0.85rem !important;
+  font-size: 0.88rem !important;
+  outline: none !important;
+  transition: border-color 200ms, box-shadow 200ms !important;
+}
+.p-inputtext:focus,
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus {
+  border-color: #0f8bfd !important;
+  box-shadow: var(--oms-focus-ring) !important;
+}
+
+.oms-select {
+  height: 42px;
+  padding: 0 0.85rem;
+  border-radius: 10px;
+  background: var(--oms-input-bg);
+  border: 1px solid var(--p-content-border-color);
+  color: var(--p-text-color);
+  font-weight: 600;
+  font-size: 0.88rem;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 200ms, box-shadow 200ms;
+}
+.oms-select:focus {
+  border-color: #0f8bfd;
+  box-shadow: var(--oms-focus-ring);
+}
+
+/* Data Table Clean Dark Styling */
+.p-datatable {
+  background: transparent !important;
+}
+.p-datatable .p-datatable-thead > tr > th {
+  background: var(--oms-subtle-bg) !important;
+  color: var(--p-text-muted-color) !important;
+  font-size: 0.76rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  border-bottom: 1px solid var(--p-content-border-color) !important;
+  padding: 0.85rem 1rem !important;
+}
+.p-datatable .p-datatable-tbody > tr {
+  background: transparent !important;
+  border-bottom: 1px solid var(--p-content-border-color) !important;
+  transition: background 150ms !important;
+}
+.p-datatable .p-datatable-tbody > tr:hover {
+  background: rgba(15, 139, 253, 0.06) !important;
+}
+.p-datatable .p-datatable-tbody > tr > td {
+  padding: 0.85rem 1rem !important;
+  color: var(--p-text-color, #f1f5f9) !important;
+  font-size: 0.88rem !important;
+}
+
+.p-dialog {
+  background: var(--p-content-background) !important;
+  border: 1px solid var(--p-content-border-color) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.3) !important;
+}
+.p-dialog .p-dialog-header {
+  background: var(--p-content-background) !important;
+  color: var(--p-text-color) !important;
+  border-bottom: 1px solid var(--p-content-border-color) !important;
+  padding: 1.25rem 1.5rem !important;
+}
+.p-dialog .p-dialog-content {
+  background: var(--p-content-background) !important;
+  color: var(--p-text-color) !important;
+  padding: 1.5rem !important;
+}
+
+.p-tag {
+  font-weight: 600 !important;
+  border-radius: 999px !important;
+  padding: 0.2rem 0.65rem !important;
+}
+
+.p-select,
+.p-multiselect,
+.p-datepicker,
+.p-popover,
+.p-menu,
+.p-tieredmenu {
+  background: var(--oms-elevated-bg) !important;
+  color: var(--p-text-color) !important;
+  border-color: var(--p-content-border-color) !important;
+}
+
+.p-select-option:hover,
+.p-select-option.p-select-option-selected,
+.p-menu-item-link:hover {
+  background: var(--oms-hover-bg) !important;
+}
+
+@media (max-width: 640px) {
+  .oms-page-header {
+    align-items: flex-start;
+    margin-bottom: 1.1rem;
+  }
+
+  .p-card .p-card-body {
+    padding: 1.05rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Hide PrimeUI License notice */
+.p-license-badge,
+[class*="license"],
+[id*="license"],
+div[style*="fixed"][style*="bottom"][style*="right"],
+body > div[style*="position: fixed"][style*="right"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+}
+
+/* ===================================================================
+   Keyframe Animation Library
+   =================================================================== */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes stagger-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes orb-float-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(30px, -20px) scale(1.12); }
+}
+
+@keyframes orb-float-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(-25px, 25px) scale(1.08); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.4); opacity: 0.6; }
+}
+
+@keyframes bell-wiggle {
+  0%, 100% { transform: rotate(0); }
+  20%      { transform: rotate(15deg); }
+  40%      { transform: rotate(-15deg); }
+  60%      { transform: rotate(10deg); }
+  80%      { transform: rotate(-5deg); }
+}
+
+@keyframes spin-ring {
+  to { transform: rotate(360deg); }
+}
+
+/* ===================================================================
+   OMS TYPOGRAPHY & WRITING STYLE PRESETS
+   =================================================================== */
+.oms-writing-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  user-select: none;
+  cursor: pointer;
+  transition: all 250ms var(--ease-bounce);
+  position: relative;
+  overflow: hidden;
+}
+
+.oms-writing-badge .oms-text {
+  position: relative;
+  z-index: 2;
+  transition: transform 200ms ease;
+}
+
+.oms-writing-badge:hover {
+  transform: translateY(-1px) scale(1.04);
+}
+
+.oms-writing-badge:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* 1. SUNRICH CRIMSON (Signature Sunrich Red Flame Gradient - Matches Sunrich Red Logo) */
+.oms-writing-badge.style-sunrich-crimson {
+  font-family: 'Outfit', 'Inter', sans-serif;
+  font-size: 0.72rem;
+  color: #ffffff;
+  background: linear-gradient(135deg, #EE2B2E 0%, #ff4d4d 50%, #ff793f 100%);
+  border: 1.5px solid rgba(255, 120, 120, 0.45);
+  box-shadow: 0 3px 12px rgba(238, 43, 46, 0.45), 0 0 0 1px rgba(238, 43, 46, 0.25);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.oms-writing-badge.style-sunrich-crimson:hover {
+  box-shadow: 0 5px 18px rgba(238, 43, 46, 0.65), 0 0 14px rgba(255, 77, 77, 0.5);
+  border-color: rgba(255, 180, 180, 0.7);
+}
+
+/* 2. CYBER NEON (Electric Cyan Orbitron Tech) */
+.oms-writing-badge.style-cyber-neon {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  color: #00f2fe;
+  background: rgba(0, 242, 254, 0.08);
+  border: 1.5px solid #00f2fe;
+  text-shadow: 0 0 8px rgba(0, 242, 254, 0.85);
+  box-shadow: 0 0 12px rgba(0, 242, 254, 0.25), inset 0 0 8px rgba(0, 242, 254, 0.15);
+}
+.oms-writing-badge.style-cyber-neon:hover {
+  background: rgba(0, 242, 254, 0.18);
+  box-shadow: 0 0 20px rgba(0, 242, 254, 0.55), inset 0 0 12px rgba(0, 242, 254, 0.3);
+}
+
+/* 3. METALLIC GOLD (Champagne & 3D Gold Shimmer Space Grotesk) */
+.oms-writing-badge.style-metallic-gold {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 0.7rem;
+  letter-spacing: 0.09em;
+  color: #fbbf24;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.18) 0%, rgba(217, 119, 6, 0.12) 100%);
+  border: 1.5px solid rgba(251, 191, 36, 0.6);
+  box-shadow: 0 3px 12px rgba(245, 158, 11, 0.3);
+  text-shadow: 0 0 6px rgba(251, 191, 36, 0.4);
+}
+.oms-writing-badge.style-metallic-gold:hover {
+  border-color: #fbbf24;
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.28) 0%, rgba(217, 119, 6, 0.2) 100%);
+  box-shadow: 0 5px 18px rgba(245, 158, 11, 0.5);
+}
+
+/* 4. GLASS MINIMAL (Frosted Glass Pill Plus Jakarta Sans) */
+.oms-writing-badge.style-glass-minimal {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.09);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
+}
+.oms-writing-badge.style-glass-minimal:hover {
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.45);
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.15);
+}
+
+/* 5. AVANT-GARDE (Cyber-cut Monogram Syne Font) */
+.oms-writing-badge.style-avant-garde {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #38bdf8;
+  background: linear-gradient(135deg, rgba(15, 139, 253, 0.18) 0%, rgba(56, 189, 248, 0.08) 100%);
+  border: 1.5px dashed rgba(56, 189, 248, 0.65);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+}
+.oms-writing-badge.style-avant-garde:hover {
+  border-style: solid;
+  border-color: #38bdf8;
+  background: rgba(56, 189, 248, 0.25);
+  color: #ffffff;
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.45);
+}
