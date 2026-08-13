@@ -190,8 +190,9 @@ interface OrgNode {
       .org-shell { display: flex; flex-direction: column; height: calc(100vh - var(--oms-topbar-height) - 47px); }
       .org-toolbar {
         display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap;
-        padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--p-content-border-color);
-        background: var(--p-content-background);
+        padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--oms-glass-border);
+        background: var(--oms-glass-strong);
+        -webkit-backdrop-filter: var(--oms-glass-filter); backdrop-filter: var(--oms-glass-filter);
       }
       .tb-left, .tb-right { display: flex; align-items: center; gap: 0.5rem; }
       :host ::ng-deep .company-select { min-width: 15rem; }
@@ -242,8 +243,10 @@ interface OrgNode {
 
       .node {
         position: relative; width: 168px; padding: 0.85rem 0.75rem 0.75rem; text-align: center; cursor: pointer;
-        background: var(--p-content-background); border: 1px solid var(--p-content-border-color);
+        background: var(--oms-glass-strong); border: 1px solid var(--oms-glass-border);
+        -webkit-backdrop-filter: var(--oms-glass-filter); backdrop-filter: var(--oms-glass-filter);
         border-top: 3px solid var(--p-primary-color); border-radius: 12px; display: inline-block;
+        box-shadow: var(--oms-glass-shadow);
         transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
       }
       .node:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28); }
@@ -262,8 +265,8 @@ interface OrgNode {
       .node-name { font-weight: 600; font-size: 0.88rem; color: var(--p-text-color); line-height: 1.2; }
       .node-title { font-size: 0.76rem; color: var(--p-text-muted-color); margin-top: 0.15rem; }
       .node-dept { font-size: 0.7rem; font-weight: 600; margin-top: 0.35rem; text-transform: uppercase; letter-spacing: 0.03em; }
-      .node-phone { display: inline-flex; align-items: center; justify-content: center; gap: 0.25rem; margin-top: 0.4rem; font-size: 0.7rem; font-weight: 600; color: #0f8bfd; background: rgba(15, 139, 253, 0.1); border-radius: 4px; padding: 2px 6px; }
-      .drawer-tel-link { display: inline-flex; align-items: center; gap: 0.35rem; color: #0f8bfd; font-weight: 700; text-decoration: none; }
+      .node-phone { display: inline-flex; align-items: center; justify-content: center; gap: 0.25rem; margin-top: 0.4rem; font-size: 0.7rem; font-weight: 600; color: var(--oms-primary); background: var(--oms-hover-bg); border-radius: 4px; padding: 2px 6px; }
+      .drawer-tel-link { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--oms-primary); font-weight: 700; text-decoration: none; }
       .drawer-tel-link:hover { text-decoration: underline; color: #38bdf8; }
       .node-toggle {
         position: absolute; bottom: -13px; left: 50%; transform: translateX(-50%);
@@ -294,10 +297,11 @@ interface OrgNode {
       .org-empty p { margin: 0; max-width: 26rem; }
 
       /* Drawer */
-      .drawer-scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); z-index: 60; }
+      .drawer-scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(3px); z-index: 60; }
       .drawer {
         position: fixed; top: 0; right: 0; bottom: 0; width: 360px; max-width: 92vw; z-index: 61;
-        background: var(--p-content-background); border-left: 1px solid var(--p-content-border-color);
+        background: var(--oms-glass-strong); border-left: 1px solid var(--oms-glass-border);
+        -webkit-backdrop-filter: var(--oms-glass-filter); backdrop-filter: var(--oms-glass-filter);
         box-shadow: -8px 0 30px rgba(0, 0, 0, 0.3); display: flex; flex-direction: column;
         animation: drawer-in 0.2s ease;
       }
@@ -323,7 +327,9 @@ interface OrgNode {
       .chain-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; font-size: 0.85rem; }
       .chain-item em { color: var(--p-text-muted-color); font-style: normal; }
       .chain-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-      @media(max-width:760px){.org-shell{height:calc(100vh - var(--oms-topbar-height))}.tb-left,.tb-right{width:100%;overflow-x:auto}.org-search{flex:1}.org-search input{min-width:12rem;width:100%}.view-3d .org-stage{transform-style:flat}.view-3d .node{transform:none}.tb-sep{display:none}}
+      @media(max-width:760px){.org-shell{height:calc(100vh - var(--oms-topbar-height))}.tb-left,.tb-right{width:100%;overflow-x:auto}.org-search{flex:1}.org-search input{min-width:12rem;width:100%}.view-3d .org-stage{transform-style:flat}.view-3d .node{transform:none}.tb-sep{display:none}
+        /* Mobile GPUs: drop per-node blur, keep the surface opaque for legibility */
+        .node,.view-3d .node{-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--p-content-background)}}
       @media(prefers-reduced-motion:reduce){.node,.org-stage,.drawer{transition:none;animation:none}.view-3d .node:hover,.view-3d .node.related{transform:translateZ(18px)}}
     `,
   ],

@@ -293,7 +293,7 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
       .status-pill { color: #6ee7b7; background: rgba(16,185,129,.1); border: 1px solid rgba(16,185,129,.26); }
       .status-pill.inactive { color: #fca5a5; background: rgba(239,68,68,.1); border-color: rgba(239,68,68,.28); }
       .profile-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
-      .profile-card { min-width: 0; padding: 1.35rem; background: var(--p-content-background); border: 1px solid var(--p-content-border-color); border-radius: var(--oms-radius); box-shadow: var(--oms-card-shadow);transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease; }
+      .profile-card { min-width: 0; padding: 1.35rem; background: var(--oms-glass-strong); -webkit-backdrop-filter: var(--oms-glass-filter); backdrop-filter: var(--oms-glass-filter); border: 1px solid var(--oms-glass-border); border-radius: var(--oms-radius); box-shadow: var(--oms-glass-shadow);transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease; }
       .profile-card:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--p-primary-color) 24%,var(--p-content-border-color));box-shadow:0 18px 34px -25px rgba(0,0,0,.55)}
       .card-heading { display: flex; align-items: center; gap: 0.75rem; padding-bottom: 1rem; border-bottom: 1px solid var(--p-content-border-color); }
       .card-heading h2 { margin: 0; font-size: 1rem; }

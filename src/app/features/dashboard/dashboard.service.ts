@@ -15,11 +15,11 @@ import {
   QuickAction,
 } from './dashboard.model';
 
-const PALETTE = ['#0f8bfd', '#8b5cf6', '#34d399', '#fbbf24', '#f472b6', '#22d3ee', '#f97316', '#84cc16', '#e879f9', '#2dd4bf'];
+const PALETTE = ['var(--oms-primary)', 'var(--oms-secondary)', '#34d399', '#fbbf24', '#f472b6', '#22d3ee', '#f97316', '#84cc16', '#e879f9', '#2dd4bf'];
 
 const ACTIVITY_STYLE: Record<string, { icon: string; color: string }> = {
   CREATE: { icon: 'pi pi-plus', color: '#34d399' },
-  UPDATE: { icon: 'pi pi-pencil', color: '#0f8bfd' },
+  UPDATE: { icon: 'pi pi-pencil', color: 'var(--oms-primary)' },
   DELETE: { icon: 'pi pi-trash', color: '#f87171' },
   RESTORE: { icon: 'pi pi-refresh', color: '#fbbf24' },
   IMPORT: { icon: 'pi pi-upload', color: '#8b5cf6' },
@@ -114,7 +114,7 @@ export class DashboardService {
 
     const companiesCard: DashboardKpi = {
       key: 'companies', label: 'Companies', value: n(companies),
-      sublabel: 'In the group', icon: 'pi pi-building', color: '#0f8bfd', route: '/companies',
+      sublabel: 'In the group', icon: 'pi pi-building', color: 'var(--oms-primary)', route: '/companies',
     };
     const deptCard: DashboardKpi = {
       key: 'departments', label: 'Departments', value: n(depts),
@@ -137,7 +137,7 @@ export class DashboardService {
     }
     const positionsCard: DashboardKpi = {
       key: 'positions', label: 'Positions', value: n(this.positions().length),
-      sublabel: 'Defined roles', icon: 'pi pi-id-card', color: '#0f8bfd', route: '/positions',
+      sublabel: 'Defined roles', icon: 'pi pi-id-card', color: 'var(--oms-primary)', route: '/positions',
     };
     return [deptCard, staffCard, positionsCard, vacancyCard];
   });
@@ -187,7 +187,7 @@ export class DashboardService {
     if (noHead) items.push({ key: 'nohead', label: 'Departments without a head', count: noHead, icon: 'pi pi-briefcase', color: '#f472b6', route: '/departments' });
 
     const incomplete = this.staff().filter((s) => !s.email || !s.title || !s.employeeCode).length;
-    if (incomplete) items.push({ key: 'incomplete', label: 'Incomplete employee records', count: incomplete, icon: 'pi pi-exclamation-circle', color: '#0f8bfd', route: '/staff' });
+    if (incomplete) items.push({ key: 'incomplete', label: 'Incomplete employee records', count: incomplete, icon: 'pi pi-exclamation-circle', color: 'var(--oms-primary)', route: '/staff' });
 
     const inactive = this.staff().filter((s) => s.status !== EntityStatus.ACTIVE).length;
     if (inactive) items.push({ key: 'inactive', label: 'Inactive employees', count: inactive, icon: 'pi pi-user-minus', color: '#94a3b8', route: '/staff' });

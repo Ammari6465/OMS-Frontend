@@ -1,0 +1,9 @@
+import { TestBed } from '@angular/core/testing';
+import { afterEach,beforeEach,describe,expect,it } from 'vitest';
+import { ThemeService } from './theme.service';
+
+describe('ThemeService',()=>{beforeEach(()=>{localStorage.clear();document.documentElement.removeAttribute('style');document.documentElement.className='';TestBed.configureTestingModule({providers:[ThemeService]})});afterEach(()=>TestBed.resetTestingModule());
+it('applies a full theme immediately and persists the identity',()=>{const service=TestBed.inject(ThemeService);service.setTheme('cyber-neon');expect(service.currentTheme()).toBe('cyber-neon');expect(localStorage.getItem('oms.writing.style')).toBe('cyber-neon');expect(document.documentElement.dataset['omsTheme']).toBe('cyber-neon');expect(document.documentElement.style.getPropertyValue('--oms-primary')).toBe('#00cfe8');expect(document.documentElement.classList.contains('theme-effect-grid')).toBe(true)});
+it('previews without overwriting the committed preference',()=>{const service=TestBed.inject(ThemeService);service.setTheme('metallic-gold');service.preview('glass-minimal');expect(document.documentElement.dataset['omsTheme']).toBe('glass-minimal');expect(service.currentTheme()).toBe('metallic-gold');service.endPreview();expect(document.documentElement.dataset['omsTheme']).toBe('metallic-gold')});
+it('restores persisted theme and keeps dark mode compatible',()=>{localStorage.setItem('oms.writing.style','avant-garde');localStorage.setItem('oms.theme.mode','light');TestBed.resetTestingModule();TestBed.configureTestingModule({providers:[ThemeService]});const service=TestBed.inject(ThemeService);expect(service.currentTheme()).toBe('avant-garde');expect(service.mode()).toBe('light');service.toggle();expect(document.documentElement.classList.contains('app-dark')).toBe(true);expect(document.documentElement.style.getPropertyValue('--p-text-color')).toBe('#edf3fc')});
+});

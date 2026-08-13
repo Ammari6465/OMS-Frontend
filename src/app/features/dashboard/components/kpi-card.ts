@@ -40,11 +40,13 @@ import { CountUp } from '../../../shared/count-up.directive';
         flex-direction: column;
         gap: 0.15rem;
         padding: 1.25rem 1.35rem;
-        border: 1px solid var(--p-content-border-color);
+        border: 1px solid var(--oms-glass-border);
         border-radius: var(--oms-radius, 14px);
         border-top: 3px solid var(--accent);
-        background: var(--p-content-background);
-        box-shadow: var(--oms-card-shadow);
+        background: var(--oms-glass-strong);
+        -webkit-backdrop-filter: var(--oms-glass-filter);
+        backdrop-filter: var(--oms-glass-filter);
+        box-shadow: var(--oms-glass-shadow);
         cursor: default;
         transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
       }

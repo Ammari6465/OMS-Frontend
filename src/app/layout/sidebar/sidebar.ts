@@ -144,7 +144,7 @@ import { OmsStyleService } from '../../core/services/oms-style.service';
         height: 44px;
         max-width: 165px;
         width: auto;
-        filter: drop-shadow(0 2px 8px rgba(15, 139, 253, 0.35));
+        filter: drop-shadow(0 2px 8px var(--oms-glow));
         transition: transform 300ms var(--ease-bounce);
       }
       .brand:hover .brand-logo-img {
@@ -154,9 +154,9 @@ import { OmsStyleService } from '../../core/services/oms-style.service';
         font-size: 0.65rem;
         font-weight: 800;
         letter-spacing: 0.06em;
-        color: #0f8bfd;
-        background: rgba(15, 139, 253, 0.14);
-        border: 1px solid rgba(15, 139, 253, 0.35);
+        color: var(--oms-primary);
+        background: var(--oms-hover-bg);
+        border: 1px solid color-mix(in srgb,var(--oms-primary) 35%,transparent);
         padding: 2px 7px;
         border-radius: 999px;
       }
@@ -222,17 +222,17 @@ import { OmsStyleService } from '../../core/services/oms-style.service';
         justify-content: center;
       }
       .nav-item:hover {
-        background: rgba(15, 139, 253, 0.12);
+        background: var(--oms-hover-bg);
         color: var(--p-text-color);
-        border-color: rgba(15, 139, 253, 0.25);
+        border-color: color-mix(in srgb,var(--oms-primary) 25%,transparent);
         transform: translateX(2px);
       }
       .nav-item:hover .nav-icon {
-        color: #0f8bfd;
+        color: var(--oms-primary);
         transform: scale(1.12);
       }
       .nav-item:hover .item-chev {
-        color: #0f8bfd;
+        color: var(--oms-primary);
         transform: translateX(2px);
       }
 
@@ -241,7 +241,7 @@ import { OmsStyleService } from '../../core/services/oms-style.service';
         background: var(--oms-hover-bg);
         color: var(--p-text-color);
         font-weight: 700;
-        border: 1px solid rgba(15, 139, 253, 0.32);
+        border: 1px var(--oms-border-style) color-mix(in srgb,var(--oms-primary) 32%,transparent);
         box-shadow: inset 3px 0 0 var(--p-primary-color);
       }
       .nav-item.active .nav-icon {
@@ -298,8 +298,8 @@ import { OmsStyleService } from '../../core/services/oms-style.service';
         height: 40px;
         border-radius: 50%;
         padding: 2px;
-        background: linear-gradient(135deg, #0f8bfd, #38bdf8);
-        box-shadow: 0 0 12px rgba(15, 139, 253, 0.4);
+        background: var(--oms-gradient);
+        box-shadow: 0 0 12px var(--oms-glow);
         flex-shrink: 0;
       }
       .suf-avatar {
@@ -307,7 +307,7 @@ import { OmsStyleService } from '../../core/services/oms-style.service';
         height: 100%;
         border-radius: 50%;
         background: var(--oms-sidebar-bg);
-        color: #0f8bfd;
+        color: var(--oms-primary);
         font-weight: 800;
         font-size: 0.9rem;
         display: grid;
@@ -356,13 +356,13 @@ import { OmsStyleService } from '../../core/services/oms-style.service';
         outline: none;
       }
       .suf-action-btn:hover {
-        background: rgba(15, 139, 253, 0.14);
-        color: #0f8bfd;
+        background: var(--oms-hover-bg);
+        color: var(--oms-primary);
         transform: translateX(2px);
       }
       .suf-action-btn.active {
-        background: rgba(15, 139, 253, 0.2);
-        color: #0f8bfd;
+        background: var(--oms-hover-bg);
+        color: var(--oms-primary);
       }
       .suf-action-btn.logout:hover {
         background: rgba(239, 68, 68, 0.15);

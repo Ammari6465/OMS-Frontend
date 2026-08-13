@@ -59,8 +59,12 @@ interface SettingRecord {
                   <div
                     class="col-12 sm:col-6 cursor-pointer p-2 border-round-lg flex align-items-center justify-content-between"
                     [style.background]="omsStyle.currentStyle() === s.id ? 'rgba(15, 139, 253, 0.12)' : 'rgba(255, 255, 255, 0.03)'"
-                    [style.border]="omsStyle.currentStyle() === s.id ? '1.5px solid #0f8bfd' : '1px solid rgba(255, 255, 255, 0.08)'"
+                    [style.border]="omsStyle.currentStyle() === s.id ? '1.5px solid var(--oms-primary)' : '1px solid var(--p-content-border-color)'"
                     (click)="omsStyle.setStyle(s.id)"
+                    (mouseenter)="omsStyle.preview(s.id)" (mouseleave)="omsStyle.endPreview()"
+                    (focusin)="omsStyle.preview(s.id)" (focusout)="omsStyle.endPreview()" tabindex="0" role="button"
+                    [attr.aria-pressed]="omsStyle.currentStyle() === s.id"
+                    (keydown.enter)="omsStyle.setStyle(s.id)" (keydown.space)="omsStyle.setStyle(s.id); $event.preventDefault()"
                   >
                     <div class="flex align-items-center gap-2">
                       <span class="oms-writing-badge {{ s.badgeClass }}">

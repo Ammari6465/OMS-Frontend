@@ -142,6 +142,15 @@ import { AskOmsService } from '../../shared/ai/ask-oms.service';
               class="style-card"
               [class.selected]="omsStyle.currentStyle() === option.id"
               (click)="selectStyle(option.id)"
+              (mouseenter)="omsStyle.preview(option.id)"
+              (mouseleave)="omsStyle.endPreview()"
+              (focusin)="omsStyle.preview(option.id)"
+              (focusout)="omsStyle.endPreview()"
+              tabindex="0"
+              role="button"
+              [attr.aria-pressed]="omsStyle.currentStyle() === option.id"
+              (keydown.enter)="selectStyle(option.id)"
+              (keydown.space)="selectStyle(option.id); $event.preventDefault()"
               pRipple
             >
               <div class="style-card-header">
@@ -153,6 +162,7 @@ import { AskOmsService } from '../../shared/ai/ask-oms.service';
               <div class="style-card-body">
                 <div class="style-name">{{ option.name }}</div>
                 <div class="style-desc">{{ option.description }}</div>
+                <div class="theme-preview" aria-hidden="true"><span></span><span></span><span></span></div>
               </div>
               @if (omsStyle.currentStyle() === option.id) {
                 <div class="active-check">
@@ -200,7 +210,7 @@ import { AskOmsService } from '../../shared/ai/ask-oms.service';
       .topbar-logo-img {
         height: 44px;
         width: auto;
-        filter: drop-shadow(0 2px 6px rgba(15, 139, 253, 0.35));
+        filter: drop-shadow(0 2px 6px var(--oms-glow));
         transition: transform 300ms var(--ease-bounce);
       }
       .topbar-brand:hover .topbar-logo-img {
@@ -223,7 +233,7 @@ import { AskOmsService } from '../../shared/ai/ask-oms.service';
         transition: all 200ms var(--ease-snap);
       }
       .topbar-search:focus-within {
-        border-color: #0f8bfd;
+        border-color: var(--oms-primary);
         background: var(--oms-input-bg);
         box-shadow: var(--oms-focus-ring);
       }
@@ -233,7 +243,7 @@ import { AskOmsService } from '../../shared/ai/ask-oms.service';
         transition: color 200ms;
       }
       .topbar-search:focus-within .search-icon {
-        color: #0f8bfd;
+        color: var(--oms-primary);
       }
       .topbar-search input {
         flex: 1;
@@ -281,9 +291,9 @@ import { AskOmsService } from '../../shared/ai/ask-oms.service';
         position: relative;
       }
       .icon-btn:hover {
-        background: rgba(15, 139, 253, 0.14);
-        color: #0f8bfd;
-        border-color: rgba(15, 139, 253, 0.35);
+        background: var(--oms-hover-bg);
+        color: var(--oms-primary);
+        border-color: color-mix(in srgb,var(--oms-primary) 35%,transparent);
         transform: translateY(-2px);
       }
 
@@ -321,13 +331,13 @@ import { AskOmsService } from '../../shared/ai/ask-oms.service';
       }
       .style-card:hover {
         background: var(--oms-hover-bg);
-        border-color: rgba(15, 139, 253, 0.4);
+        border-color: color-mix(in srgb,var(--oms-primary) 40%,transparent);
         transform: translateX(4px);
       }
       .style-card.selected {
-        background: rgba(15, 139, 253, 0.12);
-        border-color: #0f8bfd;
-        box-shadow: 0 4px 16px rgba(15, 139, 253, 0.25);
+        background: var(--oms-hover-bg);
+        border-color: var(--oms-primary);
+        box-shadow: 0 4px 16px var(--oms-glow);
       }
       .style-card-header {
         display: flex;
@@ -360,9 +370,10 @@ import { AskOmsService } from '../../shared/ai/ask-oms.service';
         line-height: 1.35;
       }
       .active-check {
-        color: #0f8bfd;
+        color: var(--oms-primary);
         font-size: 1.3rem;
       }
+      .theme-preview{display:flex;gap:4px;margin-top:.45rem}.theme-preview span{height:4px;border-radius:99px;background:var(--oms-primary)}.theme-preview span:first-child{width:32px}.theme-preview span:nth-child(2){width:18px;background:var(--oms-secondary)}.theme-preview span:last-child{width:10px;background:var(--oms-accent)}
 
       @media (max-width: 640px) {
         .brand-group span {

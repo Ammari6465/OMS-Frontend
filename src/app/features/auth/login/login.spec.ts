@@ -130,4 +130,16 @@ describe('Login Component UI & Form Workflow', () => {
       detail: 'Your account is currently inactive. Please contact your administrator.',
     });
   });
+
+  it('[POSITIVE] syncs DOM input values if autofilled by browser password manager', () => {
+    const inputEl = fixture.nativeElement.querySelector('#password') as HTMLInputElement;
+    if (inputEl) {
+      inputEl.value = 'Admin@12345';
+    }
+
+    component.form.controls.password.setValue('');
+    component.syncAutofilledValues();
+
+    expect(component.form.controls.password.value).toBe('Admin@12345');
+  });
 });

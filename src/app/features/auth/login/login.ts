@@ -46,6 +46,9 @@ interface UiError {
             class="w-full"
             autocomplete="username"
             placeholder="Enter your username"
+            (input)="syncAutofilledValues()"
+            (change)="syncAutofilledValues()"
+            (blur)="syncAutofilledValues()"
             [attr.aria-invalid]="invalid('username')"
             [attr.aria-describedby]="invalid('username') ? 'username-err' : null"
           />
@@ -65,6 +68,9 @@ interface UiError {
             [inputStyleClass]="'w-full'"
             autocomplete="current-password"
             placeholder="Enter your password"
+            (input)="syncAutofilledValues()"
+            (change)="syncAutofilledValues()"
+            (blur)="syncAutofilledValues()"
           />
           @if (invalid('password')) {
             <small id="password-err" class="err">Password is required.</small>
@@ -276,7 +282,25 @@ export class Login implements AfterViewInit {
   }
 
   ngAfterViewInit(): void {
-    queueMicrotask(() => this.usernameInput?.nativeElement.focus());
+    queueMicrotask(() => {
+      this.usernameInput?.nativeElement.focus();
+      this.syncAutofilledValues();
+    });
+    setTimeout(() => this.syncAutofilledValues(), 100);
+    setTimeout(() => this.syncAutofilledValues(), 500);
+  }
+
+  syncAutofilledValues(): void {
+    const passwordEl = document.getElementById('password') as HTMLInputElement | null;
+    if (passwordEl && passwordEl.value && !this.form.controls.password.value) {
+      this.form.controls.password.setValue(passwordEl.value);
+      this.form.controls.password.updateValueAndValidity();
+    }
+    const usernameEl = document.getElementById('username') as HTMLInputElement | null;
+    if (usernameEl && usernameEl.value && !this.form.controls.username.value) {
+      this.form.controls.username.setValue(usernameEl.value);
+      this.form.controls.username.updateValueAndValidity();
+    }
   }
 
   invalid(control: string): boolean {
@@ -291,6 +315,7 @@ export class Login implements AfterViewInit {
 
   submit(): void {
     if (this.loading()) return; // prevent duplicate submissions
+    this.syncAutofilledValues();
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;

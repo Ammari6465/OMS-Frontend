@@ -13,8 +13,19 @@
   --ease-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 
   --oms-page-bg: #f4f7fb;
-  --oms-shell-bg: #eef3f9;
+  --oms-shell-bg:
+    radial-gradient(1100px 620px at 12% -8%, rgba(15, 139, 253, 0.12), transparent 60%),
+    radial-gradient(900px 640px at 108% 6%, rgba(139, 92, 246, 0.1), transparent 55%),
+    radial-gradient(760px 700px at 50% 120%, rgba(16, 185, 129, 0.07), transparent 60%),
+    linear-gradient(180deg, #eaf1fb 0%, #f4f7fb 55%);
   --oms-sidebar-bg: #ffffff;
+
+  /* Glassmorphism layer — translucent frosted surfaces (light) */
+  --oms-glass-filter: blur(14px) saturate(1.3);
+  --oms-glass-bg: rgba(255, 255, 255, 0.6);
+  --oms-glass-strong: rgba(255, 255, 255, 0.76);
+  --oms-glass-border: rgba(255, 255, 255, 0.6);
+  --oms-glass-shadow: 0 10px 34px rgba(15, 23, 42, 0.1);
   --oms-topbar-bg: rgba(255, 255, 255, 0.88);
   --oms-input-bg: #ffffff;
   --oms-subtle-bg: #f7f9fc;
@@ -22,6 +33,20 @@
   --oms-elevated-bg: #ffffff;
   --oms-overlay-bg: rgba(15, 23, 42, 0.5);
   --oms-scroll-thumb: #b5c1d1;
+  --oms-zebra-bg: rgba(15, 23, 42, 0.025);
+
+  /* Liquid Glass layer */
+  --oms-glass-bg: rgba(255, 255, 255, 0.6);
+  --oms-glass-strong: rgba(255, 255, 255, 0.78);
+  --oms-glass-border: rgba(255, 255, 255, 0.6);
+  --oms-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  --oms-glass-blur: 16px;
+  --oms-glass-saturate: 165%;
+  --oms-ambient:
+    radial-gradient(1200px 620px at 12% -12%, rgba(15, 139, 253, 0.12), transparent 60%),
+    radial-gradient(1000px 520px at 100% 0%, rgba(139, 92, 246, 0.09), transparent 58%),
+    radial-gradient(900px 600px at 50% 120%, rgba(16, 185, 129, 0.06), transparent 60%);
+
   --p-content-background: #ffffff;
   --p-content-border-color: #dce4ee;
   --p-text-color: #162238;
@@ -30,6 +55,13 @@
   --oms-card-hover-shadow: 0 14px 32px rgba(15, 23, 42, 0.1);
   --oms-focus-ring: 0 0 0 3px rgba(15, 139, 253, 0.18);
   --oms-radius: 14px;
+  --oms-primary: #ee2b2e;
+  --oms-primary-hover: #c91f28;
+  --oms-accent: #ff8a5b;
+  --oms-glow: rgba(238,43,46,.28);
+  --oms-gradient: linear-gradient(135deg,#ee2b2e,#ff6542);
+  --oms-font: 'Outfit', 'Inter', sans-serif;
+  --oms-border-style: solid;
 
   /* Secondary, Hover & Accent Color: #0f8bfd */
   --oms-secondary: #0f8bfd;
@@ -67,8 +99,19 @@
 .app-dark {
   color-scheme: dark;
   --oms-page-bg: #0b1120;
-  --oms-shell-bg: #080d18;
+  --oms-shell-bg:
+    radial-gradient(1100px 620px at 12% -8%, rgba(15, 139, 253, 0.16), transparent 60%),
+    radial-gradient(900px 640px at 108% 6%, rgba(139, 92, 246, 0.16), transparent 55%),
+    radial-gradient(760px 700px at 50% 120%, rgba(16, 185, 129, 0.09), transparent 60%),
+    linear-gradient(180deg, #070d18 0%, #0b1120 60%);
   --oms-sidebar-bg: #0d1424;
+
+  /* Glassmorphism layer — translucent frosted surfaces (dark) */
+  --oms-glass-filter: blur(15px) saturate(1.25);
+  --oms-glass-bg: rgba(17, 26, 43, 0.6);
+  --oms-glass-strong: rgba(17, 26, 43, 0.76);
+  --oms-glass-border: rgba(255, 255, 255, 0.08);
+  --oms-glass-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
   --oms-topbar-bg: rgba(13, 20, 36, 0.88);
   --oms-input-bg: #111b2e;
   --oms-subtle-bg: #10192a;
@@ -76,6 +119,20 @@
   --oms-elevated-bg: #131d30;
   --oms-overlay-bg: rgba(3, 7, 18, 0.72);
   --oms-scroll-thumb: #334155;
+  --oms-zebra-bg: rgba(255, 255, 255, 0.032);
+
+  /* Liquid Glass layer (dark) */
+  --oms-glass-bg: rgba(19, 29, 48, 0.55);
+  --oms-glass-strong: rgba(17, 26, 43, 0.74);
+  --oms-glass-border: rgba(255, 255, 255, 0.1);
+  --oms-glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --oms-glass-blur: 18px;
+  --oms-glass-saturate: 150%;
+  --oms-ambient:
+    radial-gradient(1200px 620px at 12% -12%, rgba(15, 139, 253, 0.16), transparent 60%),
+    radial-gradient(1000px 520px at 100% 0%, rgba(139, 92, 246, 0.14), transparent 58%),
+    radial-gradient(900px 600px at 50% 120%, rgba(16, 185, 129, 0.08), transparent 60%);
+
   --p-content-background: #111a2b;
   --p-content-border-color: #253149;
   --p-text-color: #edf3fc;
@@ -103,14 +160,21 @@ body {
 }
 
 body {
-  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-family: var(--oms-font, 'Inter'), ui-sans-serif, system-ui, -apple-system, sans-serif;
   background: var(--oms-page-bg) !important;
   color: var(--p-text-color);
   font-size: 14px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  transition: background-color 360ms var(--ease-snap), color 300ms var(--ease-snap);
 }
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.5;transition:opacity 350ms ease,background 350ms ease}
+.theme-effect-radial body::before{background:radial-gradient(circle at 85% 8%,var(--oms-glow),transparent 32%)}
+.theme-effect-grid body::before{background-image:linear-gradient(var(--oms-glow) 1px,transparent 1px),linear-gradient(90deg,var(--oms-glow) 1px,transparent 1px);background-size:42px 42px;opacity:.12}
+.theme-effect-shimmer body::before{background:linear-gradient(115deg,transparent 20%,var(--oms-glow) 48%,transparent 75%);background-size:220% 100%;opacity:.18}
+.theme-effect-blobs body::before{background:radial-gradient(circle at 12% 22%,var(--oms-glow),transparent 28%),radial-gradient(circle at 88% 75%,color-mix(in srgb,var(--oms-secondary) 18%,transparent),transparent 30%);filter:blur(12px)}
+.theme-effect-blueprint body::before{background-image:linear-gradient(var(--oms-glow) 1px,transparent 1px),linear-gradient(90deg,var(--oms-glow) 1px,transparent 1px);background-size:28px 28px;opacity:.11}
 
 h1, h2, h3, h4 {
   font-weight: 700;
@@ -145,7 +209,7 @@ a:hover {
   border-radius: 999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #0f8bfd;
+  background: var(--oms-primary);
 }
 
 /* Page scaffold */
@@ -180,7 +244,7 @@ a:hover {
 /* Surface cards with modern elevation & smooth hover */
 .oms-surface-card {
   background: var(--p-content-background);
-  border: 1px solid var(--p-content-border-color);
+  border: 1px var(--oms-border-style) var(--p-content-border-color);
   border-radius: var(--oms-radius);
   box-shadow: var(--oms-card-shadow);
   transition: transform var(--oms-transition), box-shadow var(--oms-transition), border-color var(--oms-transition);
@@ -190,11 +254,44 @@ a:hover {
   box-shadow: var(--oms-card-hover-shadow);
 }
 
+/* Reusable premium empty-state — one consistent look across modules */
+.oms-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.45rem;
+  padding: 3rem 1.5rem;
+  color: var(--p-text-muted-color);
+}
+.oms-empty .oms-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  font-size: 1.7rem;
+  color: var(--p-primary-color);
+  background: color-mix(in srgb, var(--p-primary-color) 12%, transparent);
+  margin-bottom: 0.4rem;
+}
+.oms-empty h3 {
+  margin: 0;
+  color: var(--p-text-color);
+  font-size: 1.02rem;
+}
+.oms-empty p {
+  margin: 0 0 0.4rem;
+  max-width: 26rem;
+  font-size: 0.85rem;
+}
+
 /* PrimeNG Overrides & Enterprise Polish */
 .p-card {
   background: var(--p-content-background) !important;
   color: var(--p-text-color) !important;
-  border: 1px solid var(--p-content-border-color) !important;
+  border: 1px var(--oms-border-style) var(--p-content-border-color) !important;
   border-radius: var(--oms-radius) !important;
   box-shadow: var(--oms-card-shadow) !important;
   transition: transform var(--oms-transition), box-shadow var(--oms-transition), border-color var(--oms-transition);
@@ -221,10 +318,10 @@ a:hover {
   transition: all 200ms var(--ease-snap) !important;
 }
 .p-button:hover {
-  background-color: #0077e6 !important;
-  border-color: #0077e6 !important;
+  background-color: var(--oms-primary-hover) !important;
+  border-color: var(--oms-primary-hover) !important;
   transform: translateY(-1px);
-  box-shadow: 0 5px 14px rgba(15, 139, 253, 0.28) !important;
+  box-shadow: 0 5px 14px var(--oms-glow) !important;
 }
 .p-button.p-button-secondary {
   background: var(--oms-subtle-bg) !important;
@@ -243,23 +340,39 @@ a:hover {
 }
 .p-button.p-button-outlined {
   background-color: transparent !important;
-  color: #0f8bfd !important;
-  border-color: rgba(15, 139, 253, 0.4) !important;
+  color: var(--oms-primary) !important;
+  border-color: color-mix(in srgb,var(--oms-primary) 42%,transparent) !important;
 }
 .p-button.p-button-outlined:hover {
-  background-color: rgba(15, 139, 253, 0.14) !important;
-  border-color: #0f8bfd !important;
+  background-color: var(--oms-hover-bg) !important;
+  border-color: var(--oms-primary) !important;
   color: var(--p-primary-color) !important;
+}
+/* Ghost button — quiet neutral action */
+.p-button.p-button-ghost {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: var(--p-text-color) !important;
+  box-shadow: none !important;
+}
+.p-button.p-button-ghost:hover {
+  background: var(--oms-hover-bg) !important;
+  transform: none;
+  box-shadow: none !important;
+}
+/* Tactile press feedback (instant under reduced-motion) */
+.p-button:active {
+  transform: translateY(0) scale(0.98);
 }
 
 .sunrich-btn {
-  background: linear-gradient(135deg, #0f8bfd, #026ecc) !important;
+  background: var(--oms-gradient) !important;
   border: none !important;
-  box-shadow: 0 4px 14px rgba(15, 139, 253, 0.35) !important;
+  box-shadow: 0 4px 14px var(--oms-glow) !important;
 }
 .sunrich-btn:hover {
-  background: linear-gradient(135deg, #0276e2, #0257a3) !important;
-  box-shadow: 0 6px 20px rgba(15, 139, 253, 0.5) !important;
+  background: var(--oms-gradient) !important;
+  box-shadow: 0 6px 20px var(--oms-glow) !important;
 }
 
 .p-inputtext,
@@ -279,7 +392,7 @@ input[type="email"] {
 input[type="text"]:focus,
 input[type="password"]:focus,
 input[type="email"]:focus {
-  border-color: #0f8bfd !important;
+  border-color: var(--oms-primary) !important;
   box-shadow: var(--oms-focus-ring) !important;
 }
 
@@ -297,7 +410,7 @@ input[type="email"]:focus {
   transition: border-color 200ms, box-shadow 200ms;
 }
 .oms-select:focus {
-  border-color: #0f8bfd;
+  border-color: var(--oms-primary);
   box-shadow: var(--oms-focus-ring);
 }
 
@@ -321,19 +434,32 @@ input[type="email"]:focus {
   transition: background 150ms !important;
 }
 .p-datatable .p-datatable-tbody > tr:hover {
-  background: rgba(15, 139, 253, 0.06) !important;
+  background: var(--oms-hover-bg) !important;
 }
 .p-datatable .p-datatable-tbody > tr > td {
   padding: 0.85rem 1rem !important;
   color: var(--p-text-color, #f1f5f9) !important;
   font-size: 0.88rem !important;
 }
+/* Zebra striping (declared before hover so hover still wins) */
+.p-datatable .p-datatable-tbody > tr:nth-child(even) > td {
+  background: var(--oms-zebra-bg) !important;
+}
+.p-datatable .p-datatable-tbody > tr:hover > td {
+  background: var(--oms-hover-bg) !important;
+}
+/* Sticky headers for scrollable tables */
+.p-datatable-scrollable .p-datatable-thead > tr > th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
 
 .p-dialog {
   background: var(--p-content-background) !important;
   border: 1px solid var(--p-content-border-color) !important;
   border-radius: 16px !important;
-  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.3) !important;
+  box-shadow: 0 24px 64px color-mix(in srgb,var(--oms-glow) 45%,rgba(15,23,42,.35)) !important;
 }
 .p-dialog .p-dialog-header {
   background: var(--p-content-background) !important;
@@ -345,6 +471,13 @@ input[type="email"]:focus {
   background: var(--p-content-background) !important;
   color: var(--p-text-color) !important;
   padding: 1.5rem !important;
+}
+/* Subtle overlay blur behind dialogs & drawers (glassmorphism, kept light) */
+.p-dialog-mask.p-overlay-mask,
+.p-overlay-mask,
+.p-drawer-mask {
+  background: var(--oms-overlay-bg) !important;
+  backdrop-filter: blur(3px);
 }
 
 .p-tag {
@@ -363,6 +496,12 @@ input[type="email"]:focus {
   color: var(--p-text-color) !important;
   border-color: var(--p-content-border-color) !important;
 }
+.p-tooltip .p-tooltip-text{background:var(--oms-surface-elevated)!important;color:var(--p-text-color)!important;border:1px solid var(--oms-border)!important;box-shadow:var(--oms-shadow)!important}
+.p-dialog,.p-popover,.p-menu,.p-select-overlay,.p-datepicker{backdrop-filter:blur(14px)}
+.p-paginator{background:var(--p-content-background)!important;color:var(--p-text-color)!important;border-color:var(--p-content-border-color)!important}
+.p-inputtext:focus,.p-select.p-focus,.p-multiselect.p-focus{border-color:var(--oms-primary)!important;box-shadow:var(--oms-focus-ring)!important}
+[data-oms-theme='glass-minimal'] .p-card,[data-oms-theme='glass-minimal'] .oms-surface-card,[data-oms-theme='glass-minimal'] .p-dialog{backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+[data-oms-theme='avant-garde'] :where(.p-card,.oms-surface-card,.p-dialog,.p-inputtext){border-style:dashed!important}
 
 .p-select-option:hover,
 .p-select-option.p-select-option-selected,
@@ -381,6 +520,99 @@ input[type="email"]:focus {
   }
 }
 
+/* ===================================================================
+   Glassmorphism surface layer
+   Translucent frosted chrome + cards, blurring the ambient shell
+   gradient. Reverts to opaque automatically when the browser lacks
+   backdrop-filter or the user prefers reduced transparency.
+   =================================================================== */
+app-main-layout .main,
+app-main-layout .content {
+  background: transparent !important;
+}
+
+app-sidebar .sidebar {
+  background: var(--oms-glass-bg) !important;
+  -webkit-backdrop-filter: var(--oms-glass-filter);
+  backdrop-filter: var(--oms-glass-filter);
+  border-right: 1px solid var(--oms-glass-border) !important;
+}
+
+.oms-surface-card,
+.p-card {
+  background: var(--oms-glass-strong) !important;
+  -webkit-backdrop-filter: var(--oms-glass-filter);
+  backdrop-filter: var(--oms-glass-filter);
+  border: 1px solid var(--oms-glass-border) !important;
+  box-shadow: var(--oms-glass-shadow) !important;
+}
+
+.p-dialog {
+  background: var(--oms-glass-strong) !important;
+  -webkit-backdrop-filter: var(--oms-glass-filter);
+  backdrop-filter: var(--oms-glass-filter);
+  border: 1px solid var(--oms-glass-border) !important;
+}
+.p-dialog .p-dialog-header,
+.p-dialog .p-dialog-content {
+  background: transparent !important;
+}
+
+.p-select-overlay,
+.p-multiselect-overlay,
+.p-autocomplete-overlay,
+.p-datepicker-panel,
+.p-popover,
+.p-menu,
+.p-tieredmenu,
+.p-contextmenu {
+  background: var(--oms-glass-strong) !important;
+  -webkit-backdrop-filter: var(--oms-glass-filter);
+  backdrop-filter: var(--oms-glass-filter);
+  border: 1px solid var(--oms-glass-border) !important;
+}
+
+/* Component-scoped chrome, glassed for consistency */
+app-ask-oms-panel .ai-panel,
+.notification-popover {
+  background: var(--oms-glass-strong) !important;
+  -webkit-backdrop-filter: var(--oms-glass-filter);
+  backdrop-filter: var(--oms-glass-filter);
+  border: 1px solid var(--oms-glass-border) !important;
+}
+
+/* Fallback — opaque surfaces where backdrop-filter is unsupported */
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+  :root,
+  :root[data-theme='dark'],
+  .app-dark,
+  :root[data-theme='light'] {
+    --oms-glass-filter: none;
+    --oms-glass-bg: var(--p-content-background);
+    --oms-glass-strong: var(--p-content-background);
+    --oms-glass-border: var(--p-content-border-color);
+    --oms-glass-shadow: var(--oms-card-shadow);
+  }
+  app-main-layout .main,
+  app-main-layout .content {
+    background: var(--oms-page-bg) !important;
+  }
+}
+
+/* Accessibility — honour a user preference for reduced transparency */
+@media (prefers-reduced-transparency: reduce) {
+  :root,
+  :root[data-theme='dark'],
+  .app-dark,
+  :root[data-theme='light'] {
+    --oms-glass-filter: none;
+    --oms-glass-bg: var(--p-content-background);
+    --oms-glass-strong: var(--p-content-background);
+    --oms-glass-border: var(--p-content-border-color);
+    --oms-glass-shadow: var(--oms-card-shadow);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -391,6 +623,7 @@ input[type="email"]:focus {
     transition-duration: 0.01ms !important;
   }
 }
+@media (prefers-reduced-motion:no-preference){.theme-effect-shimmer body::before{animation:theme-shimmer 9s linear infinite}.theme-effect-grid body::before{animation:theme-grid 16s linear infinite}.theme-effect-blueprint body::before{animation:theme-grid 22s linear infinite}@keyframes theme-shimmer{to{background-position:-220% 0}}@keyframes theme-grid{to{background-position:42px 42px}}}
 
 /* Hide PrimeUI License notice */
 .p-license-badge,
@@ -585,4 +818,88 @@ body > div[style*="position: fixed"][style*="right"] {
   background: rgba(56, 189, 248, 0.25);
   color: #ffffff;
   box-shadow: 0 0 18px rgba(56, 189, 248, 0.45);
+}
+
+/* ===================================================================
+   Liquid Glass layer — site-wide frosted surfaces
+   Token-driven, theme-aware. Applied to the shared surface selectors
+   so every module inherits the look without component changes.
+   =================================================================== */
+
+/* Ambient light behind the shell so glass has depth to refract. */
+.layout {
+  background: var(--oms-ambient), var(--oms-shell-bg) !important;
+  background-attachment: fixed !important;
+}
+
+/* Frosted cards & primary surfaces */
+.oms-surface-card,
+.p-card {
+  background: var(--oms-glass-bg) !important;
+  backdrop-filter: blur(var(--oms-glass-blur)) saturate(var(--oms-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--oms-glass-blur)) saturate(var(--oms-glass-saturate));
+  border: 1px solid var(--oms-glass-border) !important;
+  box-shadow: var(--oms-card-shadow), var(--oms-glass-highlight) !important;
+}
+.oms-surface-card:hover,
+.p-card:hover {
+  box-shadow: var(--oms-card-hover-shadow), var(--oms-glass-highlight) !important;
+}
+
+/* Sidebar as a glass rail */
+app-sidebar .sidebar {
+  background: var(--oms-glass-bg) !important;
+  backdrop-filter: blur(calc(var(--oms-glass-blur) + 4px)) saturate(var(--oms-glass-saturate));
+  -webkit-backdrop-filter: blur(calc(var(--oms-glass-blur) + 4px)) saturate(var(--oms-glass-saturate));
+  border-right: 1px solid var(--oms-glass-border) !important;
+}
+
+/* Overlays that carry text need a touch more opacity for contrast */
+.p-dialog,
+.p-select-overlay,
+.p-multiselect-overlay,
+.p-menu,
+.p-tieredmenu,
+.p-popover,
+.p-datepicker,
+.notification-popover,
+.ai-panel {
+  background: var(--oms-glass-strong) !important;
+  backdrop-filter: blur(20px) saturate(var(--oms-glass-saturate));
+  -webkit-backdrop-filter: blur(20px) saturate(var(--oms-glass-saturate));
+  border: 1px solid var(--oms-glass-border) !important;
+  box-shadow: var(--oms-card-hover-shadow), var(--oms-glass-highlight) !important;
+}
+.p-dialog .p-dialog-header,
+.p-dialog .p-dialog-content {
+  background: transparent !important;
+}
+
+/* Glass tables float on their card; header keeps a frosted band */
+.oms-surface-card .p-datatable .p-datatable-thead > tr > th {
+  background: color-mix(in srgb, var(--oms-glass-strong) 70%, transparent) !important;
+  backdrop-filter: blur(6px);
+}
+
+/* Accessibility: honour reduced-transparency by falling back to opaque surfaces */
+@media (prefers-reduced-transparency: reduce) {
+  .layout {
+    background: var(--oms-shell-bg) !important;
+  }
+  .oms-surface-card,
+  .p-card,
+  app-sidebar .sidebar,
+  .p-dialog,
+  .p-select-overlay,
+  .p-multiselect-overlay,
+  .p-menu,
+  .p-tieredmenu,
+  .p-popover,
+  .p-datepicker,
+  .notification-popover,
+  .ai-panel {
+    background: var(--p-content-background) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
 }

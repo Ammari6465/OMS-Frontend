@@ -254,10 +254,12 @@ import { AskOmsService } from '../../shared/ai/ask-oms.service';
       /* Cards */
       .command-hero{position:relative;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(300px,.8fr);align-items:center;min-height:230px;margin-bottom:1.35rem;padding:2rem 2.25rem;overflow:hidden;border:1px solid color-mix(in srgb,var(--p-primary-color) 26%,var(--p-content-border-color));border-radius:20px;background:linear-gradient(135deg,color-mix(in srgb,var(--p-primary-color) 11%,var(--p-content-background)),var(--p-content-background) 62%);box-shadow:0 24px 55px -34px color-mix(in srgb,var(--p-primary-color) 55%,transparent);isolation:isolate}.command-hero::before{content:'';position:absolute;width:330px;height:330px;right:-90px;top:-170px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--p-primary-color) 20%,transparent),transparent 70%);z-index:-1}.hero-copy{max-width:620px}.hero-kicker{display:inline-flex;align-items:center;gap:.45rem;padding:.3rem .65rem;border:1px solid color-mix(in srgb,var(--p-primary-color) 28%,transparent);border-radius:999px;color:var(--p-primary-color);background:color-mix(in srgb,var(--p-primary-color) 8%,transparent);font-size:.72rem;font-weight:750;text-transform:uppercase;letter-spacing:.06em}.hero-copy h2{font-size:clamp(1.65rem,3vw,2.45rem);margin:.75rem 0 .35rem;letter-spacing:-.035em}.hero-copy p{margin:0;color:var(--p-text-muted-color);font-size:1rem}.hero-meta{display:flex;gap:1rem;flex-wrap:wrap;margin-top:1.15rem;color:var(--p-text-muted-color);font-size:.8rem}.hero-meta span{display:inline-flex;align-items:center;gap:.4rem}.hero-ask{margin-top:1.1rem;display:inline-flex;align-items:center;gap:.45rem;padding:.55rem 1rem;border-radius:999px;border:1px solid color-mix(in srgb,var(--p-primary-color) 45%,transparent);background:color-mix(in srgb,var(--p-primary-color) 12%,transparent);color:var(--p-primary-color);font-weight:700;font-size:.82rem;cursor:pointer;transition:background .15s,transform .15s}.hero-ask:hover{background:color-mix(in srgb,var(--p-primary-color) 20%,transparent);transform:translateY(-1px)}.hero-ask:focus-visible{outline:2px solid var(--p-primary-color);outline-offset:2px}.org-orbit{position:relative;height:190px;perspective:800px;transform-style:preserve-3d}.orbit-glow{position:absolute;inset:18% 16%;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--p-primary-color) 20%,transparent),transparent 68%);filter:blur(10px)}.orbit-node{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid color-mix(in srgb,var(--p-primary-color) 30%,var(--p-content-border-color));background:color-mix(in srgb,var(--p-content-background) 84%,transparent);backdrop-filter:blur(12px);box-shadow:0 16px 32px -18px rgba(0,0,0,.55),inset 0 1px rgba(255,255,255,.16);transform-style:preserve-3d}.orbit-node.company{left:50%;top:50%;width:112px;height:76px;border-radius:18px;transform:translate(-50%,-50%) translateZ(45px);z-index:3;color:var(--p-primary-color)}.orbit-node.company i{font-size:1.3rem}.orbit-node span{max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.7rem;margin-top:.25rem;color:var(--p-text-color)}.orbit-node.department{--node-color:var(--p-primary-color);width:76px;height:58px;border-radius:14px;border-color:color-mix(in srgb,var(--node-color) 45%,transparent);color:var(--node-color)}.orbit-node.department strong{font-size:1rem}.node-0{left:4%;top:10%;transform:translateZ(5px)}.node-1{right:4%;top:9%;transform:translateZ(16px)}.node-2{left:8%;bottom:6%;transform:translateZ(22px)}.node-3{right:7%;bottom:5%;transform:translateZ(8px)}.orbit-link{position:absolute;left:50%;top:50%;height:1px;width:38%;transform-origin:left;background:linear-gradient(90deg,color-mix(in srgb,var(--p-primary-color) 50%,transparent),transparent)}.link-0{transform:rotate(208deg)}.link-1{transform:rotate(-29deg)}.link-2{transform:rotate(151deg)}.link-3{transform:rotate(31deg)}
       .dash-card {
-        background: var(--p-content-background);
-        border: 1px solid var(--p-content-border-color);
+        background: var(--oms-glass-strong);
+        -webkit-backdrop-filter: var(--oms-glass-filter);
+        backdrop-filter: var(--oms-glass-filter);
+        border: 1px solid var(--oms-glass-border);
         border-radius: var(--oms-radius, 14px);
-        box-shadow: var(--oms-card-shadow);
+        box-shadow: var(--oms-glass-shadow);
         padding: 1.35rem 1.5rem;
         height: 100%;
       }
@@ -361,8 +363,9 @@ import { AskOmsService } from '../../shared/ai/ask-oms.service';
       /* States */
       .dash-state {
         display: flex; flex-direction: column; align-items: center; text-align: center; gap: 0.4rem;
-        padding: 4rem 1.5rem; background: var(--p-content-background); border: 1px solid var(--p-content-border-color);
-        border-radius: var(--oms-radius, 14px);
+        padding: 4rem 1.5rem; background: var(--oms-glass-strong); border: 1px solid var(--oms-glass-border);
+        -webkit-backdrop-filter: var(--oms-glass-filter); backdrop-filter: var(--oms-glass-filter);
+        border-radius: var(--oms-radius, 14px); box-shadow: var(--oms-glass-shadow);
       }
       .state-icon { width: 64px; height: 64px; border-radius: 16px; display: grid; place-items: center; font-size: 1.8rem;
         color: var(--p-primary-color); background: color-mix(in srgb, var(--p-primary-color) 12%, transparent); margin-bottom: 0.75rem; }
