@@ -10,6 +10,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { NotificationService } from '../../core/data/notification.service';
 import { LayoutService } from '../layout.service';
 import { OmsStyleService, OmsStyleId } from '../../core/services/oms-style.service';
+import { AskOmsService } from '../../shared/ai/ask-oms.service';
 
 @Component({
   selector: 'app-topbar',
@@ -65,6 +66,18 @@ import { OmsStyleService, OmsStyleId } from '../../core/services/oms-style.servi
       </div>
 
       <div class="topbar-right">
+        <button
+          type="button"
+          class="icon-btn ask-oms-btn"
+          (click)="askOms.show()"
+          pRipple
+          pTooltip="Ask OMS (Ctrl+J)"
+          tooltipPosition="bottom"
+          aria-label="Open Ask OMS assistant"
+        >
+          <i class="pi pi-sparkles"></i>
+        </button>
+
         <button
           type="button"
           class="icon-btn style-picker-btn"
@@ -365,6 +378,7 @@ export class Topbar {
   private readonly layout = inject(LayoutService);
   readonly notify = inject(NotificationService);
   readonly omsStyle = inject(OmsStyleService);
+  readonly askOms = inject(AskOmsService);
 
   readonly query = signal('');
   readonly showStyleModal = signal(false);

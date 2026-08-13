@@ -687,6 +687,7 @@ export class StaffList {
   save(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      this.reportFirstInvalid();
       return;
     }
     const id = this.editingId();
@@ -738,6 +739,33 @@ export class StaffList {
   invalid(control: string): boolean {
     const field = this.form.get(control);
     return !!field && field.invalid && (field.touched || field.dirty);
+  }
+
+  /** Human-readable labels for the form controls, used in validation feedback. */
+  private static readonly FIELD_LABELS: Record<string, string> = {
+    name: 'Full name', employeeCode: 'Employee code', companyId: 'Company', deptId: 'Department',
+    positionId: 'Position', managerId: 'Manager', title: 'Job title', email: 'Email',
+    cellNumber: 'Mobile', landline: 'Landline', photoUrl: 'Photo URL',
+  };
+
+  /**
+   * Surfaces validation failures that would otherwise be silent when the invalid
+   * control is scrolled out of view (e.g. the required Company field). Shows a
+   * toast naming the field and scrolls it into view.
+   */
+  private reportFirstInvalid(): void {
+    const firstInvalid = Object.keys(this.form.controls).find((key) => this.form.get(key)?.invalid);
+    const label = (firstInvalid && StaffList.FIELD_LABELS[firstInvalid]) || 'a required field';
+    this.messages.add({
+      severity: 'warn',
+      summary: 'Missing required details',
+      detail: `Please complete “${label}” before creating the staff member.`,
+    });
+    queueMicrotask(() => {
+      const dialog = document.querySelector('.staff-form');
+      const target = dialog?.querySelector('.error-text') ?? dialog?.querySelector('.ng-invalid');
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
   }
 
   initials(name: string): string {

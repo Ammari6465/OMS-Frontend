@@ -9,10 +9,11 @@ import { Sidebar } from '../sidebar/sidebar';
 import { Topbar } from '../topbar/topbar';
 import { LayoutService } from '../layout.service';
 import { ThemeService } from '../../core/services/theme.service';
+import { AskOmsPanel } from '../../shared/ai/ai-chat-panel/ask-oms-panel';
 
 @Component({
   selector: 'app-main-layout',
-  imports: [RouterOutlet, BreadcrumbModule, Sidebar, Topbar],
+  imports: [RouterOutlet, BreadcrumbModule, Sidebar, Topbar, AskOmsPanel],
   template: `
     <div class="layout" [class.collapsed]="layout.collapsed()" [class.mobile-open]="layout.mobileOpen()">
       <div class="sidebar-slot">
@@ -30,6 +31,8 @@ import { ThemeService } from '../../core/services/theme.service';
           <router-outlet />
         </main>
       </div>
+
+      <app-ask-oms-panel />
     </div>
   `,
   styles: [

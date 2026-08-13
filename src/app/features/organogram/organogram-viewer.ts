@@ -1,4 +1,4 @@
-import { Component, HostListener, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, HostListener, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SelectModule } from 'primeng/select';
@@ -9,6 +9,7 @@ import { MessageService } from 'primeng/api';
 
 import { OrgDataService } from '../../core/data/org-data.service';
 import { Position, Staff } from '../../core/models/organization.model';
+import { OrganogramFocusService } from '../../shared/ai/organogram-focus.service';
 
 interface OrgNode {
   staff: Staff;
@@ -330,6 +331,19 @@ interface OrgNode {
 export class OrganogramViewer implements OnInit {
   readonly org = inject(OrgDataService);
   private readonly messages = inject(MessageService);
+  private readonly focusBus = inject(OrganogramFocusService);
+
+  constructor() {
+    // Honour focus requests from the Ask OMS copilot ("Find John") by reusing
+    // the viewer's own selection/highlight logic — no duplicated hierarchy code.
+    effect(() => {
+      const req = this.focusBus.request();
+      if (req) {
+        this.focusStaff(req.staffId);
+        this.focusBus.clear();
+      }
+    });
+  }
 
   readonly companyId = signal<number | null>(null);
   readonly term = signal('');
@@ -386,6 +400,32 @@ export class OrganogramViewer implements OnInit {
   ngOnInit(): void {
     const first = this.org.companies.snapshot()[0];
     if (first) this.companyId.set(first.id);
+  }
+
+  /**
+   * Focuses a staff member by id (used by the Ask OMS copilot). Switches to the
+   * person's company if needed, expands the tree, highlights their node and
+   * reporting chain, and opens their profile — all via existing primitives.
+   */
+  focusStaff(staffId: number): void {
+    const person = this.org.staff.snapshot().find((s) => s.id === staffId);
+    if (!person) {
+      this.messages.add({ severity: 'warn', summary: 'Not found', detail: 'That person is no longer in the organogram.' });
+      return;
+    }
+    if (this.companyId() !== person.companyId) {
+      this.companyId.set(person.companyId);
+      this.collapsed.set(new Set());
+    }
+    this.expandAll();
+    this.term.set(person.name);
+    this.hoveredId.set(person.id);
+    this.selected.set(person);
+    this.zoom.set(1.1);
+    this.pan.set({ x: 0, y: 0 });
+    queueMicrotask(() => {
+      document.querySelector('.node.match')?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+    });
   }
 
   setView(mode:'2d'|'3d'):void{this.viewMode.set(mode);this.resetView()}

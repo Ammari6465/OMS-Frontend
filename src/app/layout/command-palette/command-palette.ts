@@ -4,6 +4,7 @@ import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { OrgDataService } from '../../core/data/org-data.service';
 import { Staff } from '../../core/models/organization.model';
+import { AskOmsService } from '../../shared/ai/ask-oms.service';
 
 interface QuickNavigationItem {
   label: string;
@@ -54,6 +55,17 @@ interface QuickNavigationItem {
         </div>
 
         <div class="cmd-body">
+          @if (query().trim()) {
+            <button type="button" class="cmd-item cmd-ask" (click)="askOms(query())">
+              <span class="cmd-item-icon ask"><i class="pi pi-sparkles"></i></span>
+              <span class="cmd-item-info">
+                <span class="cmd-item-title">Ask OMS: “{{ query() }}”</span>
+                <span class="cmd-item-sub">Get a natural-language answer from live OMS data</span>
+              </span>
+              <i class="pi pi-arrow-right cmd-chev"></i>
+            </button>
+          }
+
           @if (filteredStaff().length) {
             <div class="cmd-group-title">
               <span>People</span>
@@ -290,6 +302,11 @@ interface QuickNavigationItem {
         display: grid;
         place-items: center;
       }
+      .cmd-item-icon.ask {
+        color: var(--p-primary-color);
+        background: color-mix(in srgb, var(--p-primary-color) 15%, transparent);
+      }
+      .cmd-ask { border-bottom: 1px solid var(--p-content-border-color); }
 
       .cmd-item-avatar {
         border-radius: 50%;
@@ -479,6 +496,16 @@ interface QuickNavigationItem {
 export class CommandPalette {
   private readonly router = inject(Router);
   readonly org = inject(OrgDataService);
+  private readonly askOmsService = inject(AskOmsService);
+
+  /** Hands the current query to the Ask OMS copilot (Smart Global Search). */
+  askOms(query: string): void {
+    const q = query.trim();
+    if (!q) return;
+    this.visible.set(false);
+    this.askOmsService.show();
+    this.askOmsService.ask(q);
+  }
 
   @ViewChild('cmdInput') private cmdInput?: ElementRef<HTMLInputElement>;
 
