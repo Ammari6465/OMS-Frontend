@@ -98,6 +98,24 @@ describe('Ask OMS intent engine', () => {
     expect(r.actions.some((a) => a.kind === 'focus-organogram' && a.staffId === 2)).toBe(true);
   });
 
+  it('returns contact details for a person', () => {
+    const withContact = { ...ctx, staff: staff.map((s) => (s.id === 1 ? ({ ...s, email: 'john@acme.com', cellNumber: '+1 555 0100' } as Staff) : s)) };
+    const r = interpret('How can I contact John Smith?', withContact);
+    expect(r.intent).toBe('contact-info');
+    expect(r.answer).toContain('john@acme.com');
+    expect(r.answer).toContain('+1 555 0100');
+  });
+
+  it('answers a person\'s position and department', () => {
+    const pos = interpret('What is the position of John?', ctx);
+    expect(pos.intent).toBe('person-attribute');
+    expect(pos.answer).toContain('IT Director');
+
+    const dept = interpret('What department is Sarah in?', ctx);
+    expect(dept.intent).toBe('person-attribute');
+    expect(dept.answer).toContain('IT');
+  });
+
   it('finds a person by honorific or partial name', () => {
     const withDoctor = { ...ctx, staff: [...staff, { id: 9, companyId: 10, name: 'Dr. Henry Jones', title: 'Lead Architect', deptId: 100, managerId: 1, empType: EmploymentType.PERMANENT, status: EntityStatus.ACTIVE, isDeleted: false, version: 1 } as Staff] };
     for (const q of ['Find Dr.', 'Find Henry', 'Locate Jones', 'Find Hen']) {

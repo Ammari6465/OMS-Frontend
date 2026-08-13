@@ -13,6 +13,8 @@ export type AiRole = 'user' | 'assistant';
 export type AiIntentKind =
   | 'reporting-hierarchy'
   | 'manager-of'
+  | 'contact-info'
+  | 'person-attribute'
   | 'recent-hires'
   | 'join-roster'
   | 'department-stats'

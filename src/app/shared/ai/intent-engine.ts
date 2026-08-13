@@ -176,6 +176,53 @@ function getManagerOf(person: Staff, ctx: AiDataContext): AiResult {
   };
 }
 
+function getContact(person: Staff, ctx: AiDataContext): AiResult {
+  const lines: string[] = [];
+  if (person.email) lines.push(`Email: ${person.email}`);
+  if (person.cellNumber) lines.push(`Mobile: ${person.cellNumber}`);
+  if (person.landline) lines.push(`Landline: ${person.landline}`);
+  const context = {
+    name: person.name,
+    email: person.email ?? null,
+    mobile: person.cellNumber ?? null,
+    landline: person.landline ?? null,
+    department: ctx.deptName(person.deptId),
+  };
+  const actions: AiAction[] = [focusAction(person), { kind: 'navigate', label: 'Open Staff directory', icon: 'pi pi-users', route: '/staff' }];
+  if (!lines.length) {
+    return { intent: 'contact-info', context, answer: `No contact details are on record for ${person.name}.`, actions, tone: 'empty' };
+  }
+  return {
+    intent: 'contact-info',
+    context,
+    answer: `You can reach ${person.name}${person.title ? ` (${person.title})` : ''}:\n` + lines.map((l) => `• ${l}`).join('\n'),
+    actions,
+    tone: 'normal',
+  };
+}
+
+function getPersonPosition(person: Staff, ctx: AiDataContext): AiResult {
+  const dept = ctx.deptName(person.deptId);
+  const company = ctx.companyName(person.companyId);
+  const context = { name: person.name, title: person.title ?? null, department: dept, company };
+  const answer = person.title
+    ? `${person.name}'s position is ${person.title} — ${dept}, ${company}.`
+    : `${person.name} has no job title on record (${dept}, ${company}).`;
+  return { intent: 'person-attribute', context, answer, actions: [focusAction(person)], tone: person.title ? 'normal' : 'empty' };
+}
+
+function getPersonDepartment(person: Staff, ctx: AiDataContext): AiResult {
+  const dept = ctx.deptName(person.deptId);
+  const company = ctx.companyName(person.companyId);
+  return {
+    intent: 'person-attribute',
+    context: { name: person.name, department: dept, company },
+    answer: `${person.name} works in ${dept}, ${company}.`,
+    actions: [focusAction(person)],
+    tone: 'normal',
+  };
+}
+
 function getRecentJoinees(ctx: AiDataContext, days: number, label: string): AiResult {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
@@ -439,6 +486,30 @@ export function interpret(rawQuery: string, ctx: AiDataContext): AiResult {
     if (dept) return getDepartmentHead(dept, ctx);
     if (people.length > 1) return ambiguous(people, ctx);
     return noPerson('manager-of');
+  }
+
+  // Contact details for a person ("how can I contact Marcus")
+  if (/\bcontact\b|\be-?mail\b|\bphone\b|\bnumber\b|\breach\b|\bcall\b|\bmobile\b|\blandline\b|\bextension\b|\bget in touch\b/.test(q)) {
+    const people = matchStaff(query, ctx.staff);
+    if (people.length === 1) return getContact(people[0], ctx);
+    if (people.length > 1) return ambiguous(people, ctx);
+    return noPerson('contact-info');
+  }
+
+  // A person's position / title / role ("what is the position of Marcus")
+  if (/\bposition\b|\btitle\b|\brole\b|\bdesignation\b|\bjob\b|\bwhat does .* do\b/.test(q)) {
+    const people = matchStaff(query, ctx.staff);
+    if (people.length === 1) return getPersonPosition(people[0], ctx);
+    if (people.length > 1) return ambiguous(people, ctx);
+    // No named person — fall through (may be a "show all managers" style query).
+  }
+
+  // Which department a specific person is in ("what department is Marcus in")
+  if (/\b(which|what)\s+(department|team)\b|\bdepartment (is|does)\b|\bwhat team\b/.test(q)) {
+    const people = matchStaff(query, ctx.staff);
+    if (people.length === 1) return getPersonDepartment(people[0], ctx);
+    if (people.length > 1) return ambiguous(people, ctx);
+    // fall through to department-head / stats
   }
 
   // Department head / who heads X
