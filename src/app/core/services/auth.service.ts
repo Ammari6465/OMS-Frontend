@@ -79,6 +79,9 @@ export class AuthService {
   }
 
   init(): Observable<void> {
+    if (this.initialized()) {
+      return of(void 0);
+    }
     if (!this.token) {
       this.initialized.set(true);
       return of(void 0);

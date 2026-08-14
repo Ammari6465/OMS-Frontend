@@ -359,7 +359,7 @@ export class Login implements AfterViewInit {
 
   /** Only allow internal absolute paths; block open-redirects to external URLs. */
   private safeRedirect(url: string | null): string {
-    if (!url || !url.startsWith('/') || url.startsWith('//')) return '/dashboard';
+    if (!url || !url.startsWith('/') || url.startsWith('//') || url.startsWith('/auth')) return '/dashboard';
     return url;
   }
 }
