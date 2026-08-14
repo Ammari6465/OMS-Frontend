@@ -100,9 +100,10 @@ export class AuthService {
         this._currentUser.set(response.user);
       }),
       map((response) => response.user),
-      catchError((error: HttpErrorResponse) =>
-        throwError(() => ({ code: error.status === 401 ? 'INVALID_CREDENTIALS' : 'GENERIC' } as AuthError)),
-      ),
+      catchError((error: HttpErrorResponse) => {
+        const isCredentialErr = error.status === 401 || error.status === 400;
+        return throwError(() => ({ code: isCredentialErr ? 'INVALID_CREDENTIALS' : 'GENERIC' } as AuthError));
+      }),
     );
   }
 
