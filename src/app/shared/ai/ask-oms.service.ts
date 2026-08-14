@@ -40,9 +40,10 @@ export class AskOmsService {
 
   readonly suggestions = computed<AiSuggestion[]>(() => {
     const base: AiSuggestion[] = [
+      { label: 'Guide me how to add a staff', query: 'Guide me how to add a staff', icon: 'pi pi-user-plus' },
       { label: 'Which department has the most employees?', query: 'Which department has the most employees?', icon: 'pi pi-chart-bar' },
       { label: 'Show open vacancies', query: 'Show open vacancies', icon: 'pi pi-inbox' },
-      { label: 'Who joined this month?', query: 'Who joined this month?', icon: 'pi pi-user-plus' },
+      { label: 'Who joined this month?', query: 'Who joined this month?', icon: 'pi pi-calendar' },
       { label: 'Give me an organisation overview', query: 'Give me an organisation overview', icon: 'pi pi-sparkles' },
     ];
     // Seed a real name so "who reports to …" works out of the box.

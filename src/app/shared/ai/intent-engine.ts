@@ -45,9 +45,11 @@ const STOP_WORDS = new Set([
   'person', 'people', 'my', 'their', 'for', 'under', 'works', 'work', 'about', 'tell', 'can', 'you', 'please',
 ]);
 
-/** Lower-cased alphanumeric words of a name, stripping honorific prefixes. */
+/** Lower-cased alphanumeric words of a name, retaining honorifics and clean words. */
 function nameWords(name: string): string[] {
-  return name.replace(/^(dr\.|dr|mr\.|mr|mrs\.|mrs|ms\.|ms|prof\.|prof|eng\.|eng|sir|rev\.|rev)\s+/i, '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const raw = name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const clean = name.replace(/^(dr\.|dr|mr\.|mr|mrs\.|mrs|ms\.|ms|prof\.|prof|eng\.|eng|sir|rev\.|rev)\s+/i, '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  return Array.from(new Set([...raw, ...clean]));
 }
 
 /**

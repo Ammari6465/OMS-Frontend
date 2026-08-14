@@ -649,7 +649,8 @@ export class CommandPalette {
   }
 
   initials(name: string): string {
-    const parts = name.trim().split(/\s+/);
+    const clean = name.replace(/^(dr\.|dr|mr\.|mr|mrs\.|mrs|ms\.|ms|prof\.|prof|eng\.|eng|sir|rev\.|rev)\s+/i, '').trim();
+    const parts = clean.split(/\s+/);
     return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
   }
 
