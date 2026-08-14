@@ -16,7 +16,7 @@ import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { AuthService } from './core/services/auth.service';
 import { OrgDataService } from './core/data/org-data.service';
 import { NotificationService } from './core/data/notification.service';
-import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
+import { catchError, forkJoin, map, of, switchMap, tap } from 'rxjs';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -56,12 +56,12 @@ export const appConfig: ApplicationConfig = {
       const org = inject(OrgDataService);
       const notifications = inject(NotificationService);
       return auth.init().pipe(
-        switchMap(() => auth.isAuthenticated()
-          ? forkJoin([org.init(), notifications.init()]).pipe(map(() => void 0))
-          : of(void 0)),
-        // Keep the authenticated application usable when an optional data
-        // request is temporarily unavailable; individual screens show their
-        // own loading/error states and can retry.
+        tap(() => {
+          if (auth.isAuthenticated()) {
+            org.init().subscribe({ error: () => {} });
+            notifications.init().subscribe({ error: () => {} });
+          }
+        }),
         catchError(() => of(void 0)),
       );
     }),

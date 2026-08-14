@@ -330,12 +330,9 @@ export class Login implements AfterViewInit {
 
     this.auth.login({ username, password }, rememberMe).subscribe({
       next: () => {
-        forkJoin([this.org.init(), this.notifications.init()]).subscribe({
-          next: () => this.completeLogin(),
-          // Authentication has already succeeded. A temporary dashboard-data
-          // failure must not leave the user trapped on the login screen.
-          error: () => this.completeLogin(),
-        });
+        this.org.init().subscribe({ error: () => {} });
+        this.notifications.init().subscribe({ error: () => {} });
+        this.completeLogin();
       },
       error: (err: AuthError | unknown) => {
         this.loading.set(false);
