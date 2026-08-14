@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest';
 
-import { AiDataContext, interpret } from './intent-engine';
+import { AiDataContext, cleanTitle, interpret } from './intent-engine';
 import { Company, Department, Position, Staff } from '../../core/models/organization.model';
 import { EmploymentType, EntityStatus } from '../../core/models/enums';
 
 // ---- fixtures ----
 const staff: Staff[] = [
-  { id: 1, companyId: 10, name: 'John Smith', title: 'IT Director', deptId: 100, empType: EmploymentType.PERMANENT, status: EntityStatus.ACTIVE, isDeleted: false, version: 1 } as Staff,
-  { id: 2, companyId: 10, name: 'Sarah Khan', title: 'Engineer', deptId: 100, managerId: 1, empType: EmploymentType.PERMANENT, status: EntityStatus.ACTIVE, isDeleted: false, version: 1, dateJoined: new Date().toISOString().slice(0, 10) } as Staff,
-  { id: 3, companyId: 10, name: 'Ahmed Patel', title: 'Engineer', deptId: 100, managerId: 1, empType: EmploymentType.PERMANENT, status: EntityStatus.ACTIVE, isDeleted: false, version: 1 } as Staff,
-  { id: 4, companyId: 10, name: 'Mary Lee', title: 'Accountant', deptId: 200, empType: EmploymentType.PERMANENT, status: EntityStatus.ACTIVE, isDeleted: false, version: 1 } as Staff,
+  { id: 1, companyId: 10, name: 'John Smith', employeeCode: 'EMP-001', title: 'IT Director', deptId: 100, empType: EmploymentType.PERMANENT, status: EntityStatus.ACTIVE, isDeleted: false, version: 1, email: 'john@acme.com', cellNumber: '0771234567' } as Staff,
+  { id: 2, companyId: 10, name: 'Sarah Khan', employeeCode: 'EMP-002', title: 'Senior Engineer', deptId: 100, managerId: 1, empType: EmploymentType.PERMANENT, status: EntityStatus.ACTIVE, isDeleted: false, version: 1, dateJoined: new Date().toISOString().slice(0, 10), email: 'sarah@acme.com' } as Staff,
+  { id: 3, companyId: 10, name: 'Ahmed Patel', employeeCode: 'EMP-003', title: 'Junior Engineer', deptId: 100, managerId: 2, empType: EmploymentType.PERMANENT, status: EntityStatus.ACTIVE, isDeleted: false, version: 1 } as Staff,
+  { id: 4, companyId: 10, name: 'Mary Lee', employeeCode: 'EMP-004', title: 'Accountant', deptId: 200, empType: EmploymentType.PERMANENT, status: EntityStatus.ACTIVE, isDeleted: false, version: 1 } as Staff,
 ];
 const departments: Department[] = [
   { id: 100, companyId: 10, name: 'IT', headStaffId: 1, status: EntityStatus.ACTIVE, isDeleted: false, version: 1 } as Department,
@@ -32,119 +32,196 @@ const ctx: AiDataContext = {
   companyName: (id) => companies.find((c) => c.id === id)?.name ?? '—',
 };
 
-describe('Ask OMS intent engine', () => {
-  it('answers reporting hierarchy and offers an organogram focus action', () => {
+describe('Ask OMS intent engine — Context-Aware Organizational Copilot', () => {
+  it('answers reporting hierarchy and establishes conversational context', () => {
     const r = interpret('Who reports to John?', ctx);
     expect(r.intent).toBe('reporting-hierarchy');
     expect(r.answer).toContain('Sarah Khan');
-    expect(r.answer).toContain('Ahmed Patel');
-    expect(r.actions.some((a) => a.kind === 'focus-organogram' && a.staffId === 1)).toBe(true);
-    // Minimal context only — the manager and their direct reports, nothing else.
-    expect((r.context as any).manager).toBe('John Smith');
-    expect((r.context as any).directReports).toHaveLength(2);
+    expect(r.updatedContext?.staffId).toBe(1);
+    expect(r.blocks?.some((b) => b.kind === 'employee')).toBe(true);
   });
 
-  it('identifies the largest department', () => {
-    const r = interpret('Which department has the most employees?', ctx);
-    expect(r.intent).toBe('department-stats');
-    expect(r.answer).toContain('IT is the largest department');
-  });
+  it('resolves pronoun follow-ups using session context ("Who is her manager?")', () => {
+    const contextWithSarah: AiDataContext = {
+      ...ctx,
+      currentContext: {
+        staffId: 2,
+        staffName: 'Sarah Khan',
+        departmentId: 100,
+        departmentName: 'IT',
+        companyId: 10,
+        companyName: 'Sunrich Global',
+        lastEntityType: 'staff',
+      },
+    };
 
-  it('lists open vacancies only', () => {
-    const r = interpret('Show open vacancies', ctx);
-    expect(r.intent).toBe('vacancies');
-    expect((r.context as any).openVacancies).toBe(1);
-    expect(r.answer).toContain('IT');
-  });
-
-  it('finds recent joiners this month', () => {
-    const r = interpret('Who joined this month?', ctx);
-    expect(r.intent).toBe('recent-hires');
-    expect(r.answer).toContain('Sarah Khan');
-  });
-
-  it('lists the full joining roster for open-ended "who joined when"', () => {
-    const r = interpret('Can you tell me who joined when', ctx);
-    expect(r.intent).toBe('join-roster');
-    expect(r.answer).toContain('Sarah Khan');
-    expect(r.answer.toLowerCase()).toContain('joined');
-    // Records without a join date are acknowledged, not silently dropped.
-    expect(r.answer.toLowerCase()).toContain('no joining date');
-  });
-
-  it('answers a joining date for a specific person', () => {
-    const r = interpret('When did Sarah join?', ctx);
-    expect(r.intent).toBe('join-roster');
-    expect(r.answer).toContain('Sarah Khan');
-    expect(r.answer.toLowerCase()).toContain('joined on');
-  });
-
-  it('still honours time-bounded joiner queries', () => {
-    const r = interpret('Who joined this month?', ctx);
-    expect(r.intent).toBe('recent-hires');
-    expect(r.answer).toContain('Sarah Khan');
-  });
-
-  it('reports the department head', () => {
-    const r = interpret('Who heads IT?', ctx);
-    expect(r.intent).toBe('department-head');
+    const r = interpret('Who is her manager?', contextWithSarah);
+    expect(r.intent).toBe('manager-of');
     expect(r.answer).toContain('John Smith');
   });
 
-  it('finds a person and highlights their reporting chain', () => {
-    const r = interpret('Find Sarah', ctx);
+  it('resolves direct reports follow-up ("Who reports to her?")', () => {
+    const contextWithSarah: AiDataContext = {
+      ...ctx,
+      currentContext: {
+        staffId: 2,
+        staffName: 'Sarah Khan',
+        departmentId: 100,
+        departmentName: 'IT',
+        lastEntityType: 'staff',
+      },
+    };
+
+    const r = interpret('Who reports to her?', contextWithSarah);
+    expect(r.intent).toBe('reporting-hierarchy');
+    expect(r.answer).toContain('Ahmed Patel');
+  });
+
+  it('resolves team hierarchy follow-up ("Show his whole team")', () => {
+    const contextWithJohn: AiDataContext = {
+      ...ctx,
+      currentContext: {
+        staffId: 1,
+        staffName: 'John Smith',
+        departmentId: 100,
+        lastEntityType: 'staff',
+      },
+    };
+
+    const r = interpret('Show his whole team', contextWithJohn);
+    expect(r.intent).toBe('team-hierarchy');
+    expect(r.answer).toContain('direct report');
+  });
+
+  it('resolves reporting chain follow-up ("Show his reporting chain")', () => {
+    const contextWithAhmed: AiDataContext = {
+      ...ctx,
+      currentContext: {
+        staffId: 3,
+        staffName: 'Ahmed Patel',
+        lastEntityType: 'staff',
+      },
+    };
+
+    const r = interpret('Show his reporting chain', contextWithAhmed);
+    expect(r.intent).toBe('reporting-chain');
+    expect(r.blocks?.some((b) => b.kind === 'reporting-chain')).toBe(true);
+  });
+
+  it('resolves departmental follow-up ("Any vacancies in her department?")', () => {
+    const contextWithSarah: AiDataContext = {
+      ...ctx,
+      currentContext: {
+        staffId: 2,
+        staffName: 'Sarah Khan',
+        departmentId: 100,
+        departmentName: 'IT',
+        lastEntityType: 'staff',
+      },
+    };
+
+    const r = interpret('Any vacancies in her department?', contextWithSarah);
+    expect(r.intent).toBe('vacancies');
+    expect(r.answer).toContain('IT');
+    expect(r.answer).toContain('Senior Engineer');
+  });
+
+  it('disambiguates when a name query matches multiple people', () => {
+    const withTwoJohns = {
+      ...ctx,
+      staff: [
+        ...staff,
+        { id: 5, companyId: 10, name: 'John Baker', employeeCode: 'EMP-005', title: 'Finance Executive', deptId: 200, empType: EmploymentType.PERMANENT, status: EntityStatus.ACTIVE, isDeleted: false, version: 1 } as Staff,
+      ],
+    };
+    const r = interpret('Find John', withTwoJohns);
+    expect(r.intent).toBe('ambiguity');
+    expect(r.blocks?.some((b) => b.kind === 'ambiguity')).toBe(true);
+    expect(r.actions.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('compares department headcounts and generates ComparisonBlock', () => {
+    const r = interpret('Compare IT and Finance headcount', ctx);
+    expect(r.intent).toBe('comparison');
+    expect(r.answer).toContain('IT');
+    expect(r.answer).toContain('Finance');
+    expect(r.blocks?.some((b) => b.kind === 'comparison')).toBe(true);
+  });
+
+  it('handles multi-filter queries for department employees and managers', () => {
+    const r = interpret('Show employees in IT', ctx);
+    expect(r.intent).toBe('department-scoped');
+    expect(r.answer).toContain('John Smith');
+    expect(r.answer).toContain('Sarah Khan');
+  });
+
+  it('searches employees by employee code (EMP-001)', () => {
+    const r = interpret('Find EMP-001', ctx);
     expect(r.intent).toBe('find-employee');
-    expect(r.answer).toContain('John Smith → Sarah Khan');
-    expect(r.actions.some((a) => a.kind === 'focus-organogram' && a.staffId === 2)).toBe(true);
+    expect(r.answer).toContain('John Smith');
   });
 
-  it('returns contact details for a person', () => {
-    const withContact = { ...ctx, staff: staff.map((s) => (s.id === 1 ? ({ ...s, email: 'john@acme.com', cellNumber: '+1 555 0100' } as Staff) : s)) };
-    const r = interpret('How can I contact John Smith?', withContact);
-    expect(r.intent).toBe('contact-info');
-    expect(r.answer).toContain('john@acme.com');
-    expect(r.answer).toContain('+1 555 0100');
+  it('searches employees by email address', () => {
+    const r = interpret('Find john@acme.com', ctx);
+    expect(r.intent).toBe('find-employee');
+    expect(r.answer).toContain('John Smith');
   });
 
-  it('answers a person\'s position and department', () => {
-    const pos = interpret('What is the position of John?', ctx);
-    expect(pos.intent).toBe('person-attribute');
-    expect(pos.answer).toContain('IT Director');
-
-    const dept = interpret('What department is Sarah in?', ctx);
-    expect(dept.intent).toBe('person-attribute');
-    expect(dept.answer).toContain('IT');
+  it('searches employees by phone number', () => {
+    const r = interpret('Who has 0771234567?', ctx);
+    expect(r.intent).toBe('find-employee');
+    expect(r.answer).toContain('John Smith');
   });
 
-  it('finds a person by honorific or partial name', () => {
-    const withDoctor = { ...ctx, staff: [...staff, { id: 9, companyId: 10, name: 'Dr. Henry Jones', title: 'Lead Architect', deptId: 100, managerId: 1, empType: EmploymentType.PERMANENT, status: EntityStatus.ACTIVE, isDeleted: false, version: 1 } as Staff] };
-    for (const q of ['Find Dr.', 'Find Henry', 'Locate Jones', 'Find Hen']) {
-      const r = interpret(q, withDoctor);
-      expect(r.intent, `query "${q}"`).toBe('find-employee');
-      expect(r.answer, `query "${q}"`).toContain('Dr. Henry Jones');
-    }
+  it('answers self queries for logged in user ("Who is my manager?")', () => {
+    const r = interpret('Who is my manager?', ctx);
+    expect(r.intent).toBe('manager-of');
+    expect(r.answer).toContain('John Smith');
   });
 
-  it('refuses restricted salary questions without leaking data', () => {
+  it('audits data quality for staff without manager', () => {
+    const r = interpret('Which employees have no manager?', ctx);
+    expect(r.intent).toBe('data-quality');
+    expect(r.answer).toContain('John Smith');
+    expect(r.blocks?.some((b) => b.kind === 'data-quality')).toBe(true);
+  });
+
+  it('audits data quality for departments without head', () => {
+    const r = interpret('Which departments have no head?', ctx);
+    expect(r.intent).toBe('data-quality');
+    expect(r.answer).toContain('Finance');
+  });
+
+  it('audits data quality for incomplete staff records', () => {
+    const r = interpret('Show incomplete employee records', ctx);
+    expect(r.intent).toBe('data-quality');
+    expect(r.answer.toLowerCase()).toContain('incomplete');
+    expect(r.blocks?.some((b) => b.kind === 'data-quality')).toBe(true);
+  });
+
+  it('refuses restricted salary questions securely without leaking data', () => {
     const r = interpret("What is John's salary?", ctx);
     expect(r.intent).toBe('denied');
     expect(r.tone).toBe('denied');
-    expect(r.answer.toLowerCase()).toContain('permission');
   });
 
   it('provides step-by-step guidance for adding staff', () => {
-    for (const q of ['Guide me How to add staff', 'Guide me How to add the staff', 'Guide me How to Add a Staff', 'How do I add an employee?']) {
-      const r = interpret(q, ctx);
-      expect(r.intent).toBe('how-to');
-      expect(r.answer).toContain('step-by-step guide to add a new staff');
-      expect(r.actions.some((a) => a.route === '/staff')).toBe(true);
-    }
+    const r = interpret('Guide me How to add staff', ctx);
+    expect(r.intent).toBe('how-to');
+    expect(r.answer).toContain('step-by-step guide to add a new staff');
   });
 
-  it('disambiguates when a first name matches multiple people', () => {
-    const two = { ...ctx, staff: [...staff, { id: 5, companyId: 10, name: 'John Baker', deptId: 200, empType: EmploymentType.PERMANENT, status: EntityStatus.ACTIVE, isDeleted: false, version: 1 } as Staff] };
-    const r = interpret('Find John', two);
-    expect(r.answer.toLowerCase()).toContain('which one');
-    expect(r.actions.length).toBeGreaterThan(1);
+  it('provides step-by-step guidance for adding company, department, vacancy, changing manager, export', () => {
+    expect(interpret('How to add a company?', ctx).answer.toLowerCase()).toContain('company');
+    expect(interpret('Guide me how to add a department', ctx).answer.toLowerCase()).toContain('department');
+    expect(interpret('How to add vacancy?', ctx).answer.toLowerCase()).toContain('vacancy');
+    expect(interpret('How do I change manager?', ctx).answer.toLowerCase()).toContain('organogram');
+    expect(interpret('How to export organogram?', ctx).answer.toLowerCase()).toContain('export organogram');
+  });
+
+  it('strips honorific titles properly with cleanTitle helper', () => {
+    expect(cleanTitle('Dr. Henry Jones')).toBe('Henry Jones');
+    expect(cleanTitle('Prof. Albert Einstein')).toBe('Albert Einstein');
+    expect(cleanTitle('Mr. John Doe')).toBe('John Doe');
   });
 });

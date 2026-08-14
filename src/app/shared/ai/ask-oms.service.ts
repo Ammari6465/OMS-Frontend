@@ -3,22 +3,24 @@ import { Router } from '@angular/router';
 import { Observable, of } from 'rxjs';
 import { catchError, map, switchMap } from 'rxjs/operators';
 
-import { environment } from '../../../environments/environment';
 import { OrgDataService } from '../../core/data/org-data.service';
 import { AuditService } from '../../core/data/audit.service';
 import { NotificationService } from '../../core/data/notification.service';
 import { AuthService } from '../../core/services/auth.service';
-import { AiAction, AiMessage, AiResult, AiSuggestion } from './ai-models';
-import { AiDataContext, interpret } from './intent-engine';
+import { AiAction, AiMessage, AiResult, AiSuggestion, AskOmsContext } from './ai-models';
+import { AiDataContext, generateFollowUpSuggestions, interpret } from './intent-engine';
 import { AiProvider, LocalTemplateProvider } from './ai-provider';
 import { OrganogramFocusService } from './organogram-focus.service';
 
 const ACTIVITY_RE = /\b(activit(y|ies)|what happened|what.s new|today.s (summary|updates?)|summar(y|ise|ize) (today|the day|activity)|notification summary)\b/i;
 
 /**
- * Orchestrates the Ask OMS copilot: owns the session conversation, builds an
- * RBAC-scoped data context, routes questions through the deterministic intent
- * engine, and delegates only the final wording to a pluggable {@link AiProvider}.
+ * Orchestrates the Ask OMS organizational copilot:
+ * - Manages session conversation history & conversational entity context (pronouns, entity references).
+ * - Builds an RBAC-scoped data context.
+ * - Routes questions through the deterministic intent engine.
+ * - Updates dynamic follow-up suggestions based on the active conversation topic.
+ * - Delegates final wording to a pluggable {@link AiProvider}.
  */
 @Injectable({ providedIn: 'root' })
 export class AskOmsService {
@@ -35,27 +37,43 @@ export class AskOmsService {
   readonly open = signal(false);
   readonly busy = signal(false);
   readonly messages = signal<AiMessage[]>([]);
+  readonly sessionContext = signal<AskOmsContext>({});
 
   private seq = 0;
 
+  /** Dynamic role- and context-aware suggestions */
   readonly suggestions = computed<AiSuggestion[]>(() => {
+    const ctx = this.sessionContext();
+    const dataCtx = this.buildContext();
+
+    if (ctx.staffName || ctx.departmentName) {
+      return generateFollowUpSuggestions(ctx.lastIntent ?? 'find-employee', ctx, dataCtx);
+    }
+
     const base: AiSuggestion[] = [
       { label: 'Guide me how to add a staff', query: 'Guide me how to add a staff', icon: 'pi pi-user-plus' },
       { label: 'Which department has the most employees?', query: 'Which department has the most employees?', icon: 'pi pi-chart-bar' },
       { label: 'Show open vacancies', query: 'Show open vacancies', icon: 'pi pi-inbox' },
-      { label: 'Who joined this month?', query: 'Who joined this month?', icon: 'pi pi-calendar' },
-      { label: 'Give me an organisation overview', query: 'Give me an organisation overview', icon: 'pi pi-sparkles' },
+      { label: 'Who joined recently?', query: 'Who joined recently?', icon: 'pi pi-calendar' },
+      { label: 'Compare Finance and Operations', query: 'Compare Finance and Operations headcount', icon: 'pi pi-chart-bar' },
     ];
-    // Seed a real name so "who reports to …" works out of the box.
+
+    // Seed a real employee name for quick demonstration
     const sample = this.org.staff.snapshot()[0];
     if (sample) {
       const first = sample.name.trim().split(/\s+/)[0];
-      base.unshift({ label: `Who reports to ${first}?`, query: `Who reports to ${first}?`, icon: 'pi pi-sitemap' });
-      base.push({ label: `Find ${first} in the Organogram`, query: `Find ${first}`, icon: 'pi pi-search' });
+      base.unshift({ label: `Find ${first}`, query: `Find ${sample.name}`, icon: 'pi pi-search' });
     }
+
+    // Role-specific admin suggestions
     if (this.auth.isAdmin()) {
-      base.push({ label: "Summarise today's activity", query: "Summarise today's activity", icon: 'pi pi-history' });
+      base.push(
+        { label: 'Staff with no manager', query: 'Which employees have no manager?', icon: 'pi pi-exclamation-circle' },
+        { label: 'Departments with no head', query: 'Which departments have no head?', icon: 'pi pi-exclamation-triangle' },
+        { label: "Summarise today's activity", query: "Summarise today's activity", icon: 'pi pi-history' },
+      );
     }
+
     return base.slice(0, 6);
   });
 
@@ -77,6 +95,28 @@ export class AskOmsService {
 
   reset(): void {
     this.messages.set([]);
+    this.sessionContext.set({});
+  }
+
+  clearContext(): void {
+    this.sessionContext.set({});
+  }
+
+  selectStaffContext(staffId: number): void {
+    const staff = this.org.staff.snapshot().find((s) => s.id === staffId);
+    if (!staff) return;
+    this.sessionContext.update((c) => ({
+      ...c,
+      staffId: staff.id,
+      staffName: staff.name,
+      departmentId: staff.deptId,
+      departmentName: this.org.departmentName(staff.deptId),
+      companyId: staff.companyId,
+      companyName: this.org.companyName(staff.companyId),
+      lastEntityType: 'staff',
+      lastIntent: 'find-employee',
+    }));
+    this.ask(`Find ${staff.name}`);
   }
 
   ask(query: string): void {
@@ -88,31 +128,53 @@ export class AskOmsService {
     this.messages.update((m) => [...m, { id: pendingId, role: 'assistant', text: '', pending: true, ts: Date.now() }]);
     this.busy.set(true);
 
+    const dataContext = this.buildContext();
+
     const result$: Observable<AiResult> = ACTIVITY_RE.test(q)
       ? this.activitySummary()
-      : of(interpret(q, this.buildContext()));
+      : of(interpret(q, dataContext));
 
     result$
       .pipe(
         switchMap((result) => this.provider.rephrase(result, q).pipe(map((text) => ({ result, text })))),
-        catchError(() =>
-          of({
-            result: {
-              intent: 'unknown' as const,
-              context: {},
-              answer: 'Something went wrong while answering that. Please try again.',
-              actions: [] as AiAction[],
-              tone: 'error' as const,
-            },
-            text: 'Something went wrong while answering that. Please try again.',
-          }),
-        ),
+        catchError(() => {
+          const fallback: AiResult = {
+            intent: 'unknown',
+            context: {},
+            answer: 'Something went wrong while answering that. Please try again.',
+            actions: [],
+            tone: 'error',
+          };
+          return of({
+            result: fallback,
+            text: fallback.answer,
+          });
+        }),
       )
       .subscribe(({ result, text }) => {
+        // Update conversational context if new entity was established
+        if (result.updatedContext) {
+          this.sessionContext.update((prev) => ({
+            ...prev,
+            ...result.updatedContext,
+            lastQuery: q,
+          }));
+        }
+
+        const dynamicSuggestions = result.suggestions ?? generateFollowUpSuggestions(result.intent, this.sessionContext(), dataContext);
+
         this.messages.update((m) =>
           m.map((msg) =>
             msg.id === pendingId
-              ? { ...msg, text, actions: result.actions, tone: result.tone, pending: false }
+              ? {
+                  ...msg,
+                  text,
+                  actions: result.actions,
+                  blocks: result.blocks,
+                  suggestions: dynamicSuggestions,
+                  tone: result.tone,
+                  pending: false,
+                }
               : msg,
           ),
         );
@@ -121,12 +183,26 @@ export class AskOmsService {
   }
 
   runAction(action: AiAction): void {
+    if (action.kind === 'select-context' && action.staffId != null) {
+      this.selectStaffContext(action.staffId);
+      return;
+    }
+
+    if (action.kind === 'ask-prompt' && action.prompt) {
+      this.ask(action.prompt);
+      return;
+    }
+
     if (action.kind === 'focus-organogram' && action.staffId != null) {
       this.organogramFocus.focus(action.staffId);
       void this.router.navigate(['/organogram']);
       if (window.matchMedia('(max-width: 720px)').matches) this.close();
     } else if (action.kind === 'navigate' && action.route) {
-      void this.router.navigate([action.route]);
+      const queryParams: Record<string, any> = {};
+      if (action.deptId != null) queryParams['deptId'] = action.deptId;
+      if (action.companyId != null) queryParams['companyId'] = action.companyId;
+      if (action.staffId != null) queryParams['staffId'] = action.staffId;
+      void this.router.navigate([action.route], { queryParams });
       if (window.matchMedia('(max-width: 720px)').matches) this.close();
     }
   }
@@ -143,12 +219,12 @@ export class AskOmsService {
       canViewActivity: this.auth.isAdmin(),
       deptName: (id) => this.org.departmentName(id),
       companyName: (id) => this.org.companyName(id),
+      currentContext: this.sessionContext(),
     };
   }
 
   /**
-   * Today's activity summary. Admins get an audit-trail breakdown (SQL-side
-   * counts, AI only explains); other users get their own notification summary.
+   * Today's activity summary. Admins get an audit-trail breakdown.
    * RBAC is enforced here — the audit trail is never read for non-admins.
    */
   private activitySummary(): Observable<AiResult> {

@@ -6,7 +6,7 @@ import { AiSuggestions } from '../ai-suggestions/ai-suggestions';
 import { AiMessageComponent } from '../ai-message/ai-message';
 
 /**
- * Ask OMS copilot — a collapsible chat panel plus a floating launcher.
+ * Ask OMS organizational copilot — a collapsible context-aware chat panel plus a floating launcher.
  * Globally mounted once in the app shell. Fully keyboard-operable:
  *   • Ctrl/⌘ + J toggles the panel (Ctrl/⌘ + K is the command palette)
  *   • Esc closes it · Enter sends · Shift+Enter inserts a newline
@@ -32,23 +32,55 @@ import { AiMessageComponent } from '../ai-message/ai-message';
             <span class="ai-mark"><i class="pi pi-sparkles"></i></span>
             <div>
               <h2 id="ai-title">Ask OMS</h2>
-              <p>Natural-language answers from live OMS data</p>
+              <p>Context-aware organizational copilot</p>
             </div>
           </div>
           <div class="ai-head-actions">
             @if (ai.messages().length) {
-              <button type="button" class="ai-icon" (click)="ai.reset()" aria-label="Clear conversation" title="Clear conversation"><i class="pi pi-eraser"></i></button>
+              <button type="button" class="ai-icon" (click)="ai.reset()" aria-label="New conversation" title="New conversation">
+                <i class="pi pi-plus-circle"></i>
+              </button>
+              <button type="button" class="ai-icon" (click)="ai.reset()" aria-label="Clear conversation" title="Clear conversation">
+                <i class="pi pi-eraser"></i>
+              </button>
             }
-            <button type="button" class="ai-icon" (click)="ai.close()" aria-label="Close Ask OMS" title="Close"><i class="pi pi-times"></i></button>
+            <button type="button" class="ai-icon" (click)="ai.close()" aria-label="Close Ask OMS" title="Close">
+              <i class="pi pi-times"></i>
+            </button>
           </div>
         </header>
+
+        <!-- Conversational Context Indicator Bar -->
+        @if (ai.sessionContext().staffName || ai.sessionContext().departmentName || ai.sessionContext().companyName) {
+          <div class="ai-context-banner">
+            <div class="ctx-pill">
+              <i class="pi pi-compass"></i>
+              <span>
+                Active:
+                @if (ai.sessionContext().staffName) {
+                  <strong>{{ ai.sessionContext().staffName }}</strong>
+                  @if (ai.sessionContext().departmentName) {
+                    <small> · {{ ai.sessionContext().departmentName }}</small>
+                  }
+                } @else if (ai.sessionContext().departmentName) {
+                  <strong>{{ ai.sessionContext().departmentName }} Department</strong>
+                } @else if (ai.sessionContext().companyName) {
+                  <strong>{{ ai.sessionContext().companyName }}</strong>
+                }
+              </span>
+            </div>
+            <button type="button" class="clear-ctx-btn" (click)="ai.clearContext()" title="Clear entity context">
+              <i class="pi pi-times"></i>
+            </button>
+          </div>
+        }
 
         <div class="ai-body" #scroll>
           @if (!ai.messages().length) {
             <div class="ai-welcome">
               <span class="ai-mark lg"><i class="pi pi-sparkles"></i></span>
               <h3>How can I help?</h3>
-              <p>Ask about reporting lines, headcount, vacancies, recent joiners, or find anyone in the Organogram.</p>
+              <p>Ask about employees, managers, team hierarchies, vacancies, department comparisons, or find anyone in the Organogram.</p>
               <app-ai-suggestions [suggestions]="ai.suggestions()" (pick)="send($event)" />
             </div>
           } @else {
@@ -63,12 +95,13 @@ import { AiMessageComponent } from '../ai-message/ai-message';
         <form class="ai-input" (submit)="submit($event)">
           <textarea #box rows="1" [value]="draft" (input)="draft = $any($event.target).value"
             (keydown)="onKey($event)" [disabled]="ai.busy()"
-            placeholder="Ask about your organisation…" aria-label="Ask OMS a question"></textarea>
+            placeholder="Ask about your organisation (e.g. Find Sarah, Who reports to her?)..."
+            aria-label="Ask OMS a question"></textarea>
           <button type="submit" class="ai-send" [disabled]="ai.busy() || !draft.trim()" aria-label="Send question">
             <i class="pi" [class.pi-send]="!ai.busy()" [class.pi-spin]="ai.busy()" [class.pi-spinner]="ai.busy()"></i>
           </button>
         </form>
-        <p class="ai-foot">Ask OMS respects your access permissions. Answers come from live records; verify before acting.</p>
+        <p class="ai-foot">Ask OMS derives answers deterministically from live OMS records. Context is maintained for this session.</p>
       </aside>
     }
   `,
@@ -92,7 +125,7 @@ import { AiMessageComponent } from '../ai-message/ai-message';
       .ai-scrim { position: fixed; inset: 0; background: rgba(2, 6, 23, 0.35); z-index: 1199; backdrop-filter: blur(1px); }
       .ai-panel {
         position: fixed; right: 1.25rem; bottom: 1.25rem; top: auto; z-index: 1201;
-        width: min(420px, calc(100vw - 2rem)); height: min(640px, calc(100vh - 2.5rem));
+        width: min(440px, calc(100vw - 2rem)); height: min(670px, calc(100vh - 2.5rem));
         display: flex; flex-direction: column; overflow: hidden;
         border: 1px solid var(--p-content-border-color); border-radius: 18px;
         background: var(--p-content-background);
@@ -109,7 +142,7 @@ import { AiMessageComponent } from '../ai-message/ai-message';
         color: var(--p-primary-color); background: color-mix(in srgb, var(--p-primary-color) 15%, transparent);
         box-shadow: inset 0 1px rgba(255, 255, 255, 0.2); }
       .ai-mark.lg { width: 46px; height: 46px; font-size: 1.25rem; margin: 0 auto; }
-      .ai-head h2 { margin: 0; font-size: 1rem; }
+      .ai-head h2 { margin: 0; font-size: 1rem; font-weight: 700; }
       .ai-head p { margin: 0.1rem 0 0; font-size: 0.72rem; color: var(--p-text-muted-color); }
       .ai-head-actions { display: flex; gap: 0.3rem; }
       .ai-icon { width: 32px; height: 32px; border: 1px solid transparent; border-radius: 8px; background: transparent;
@@ -117,10 +150,22 @@ import { AiMessageComponent } from '../ai-message/ai-message';
       .ai-icon:hover { background: var(--oms-hover-bg, color-mix(in srgb, var(--p-primary-color) 8%, transparent)); color: var(--p-text-color); }
       .ai-icon:focus-visible { outline: 2px solid var(--p-primary-color); outline-offset: 2px; }
 
+      .ai-context-banner {
+        display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.4rem 0.9rem;
+        background: color-mix(in srgb, var(--p-primary-color) 8%, var(--p-content-background));
+        border-bottom: 1px solid color-mix(in srgb, var(--p-primary-color) 20%, transparent);
+        font-size: 0.76rem;
+      }
+      .ctx-pill { display: flex; align-items: center; gap: 0.45rem; color: var(--p-primary-color); }
+      .ctx-pill i { font-size: 0.8rem; }
+      .ctx-pill strong { color: var(--p-text-color); }
+      .clear-ctx-btn { border: none; background: transparent; color: var(--p-text-muted-color); cursor: pointer; padding: 2px; border-radius: 4px; font-size: 0.75rem; }
+      .clear-ctx-btn:hover { color: var(--p-primary-color); }
+
       .ai-body { flex: 1; overflow-y: auto; padding: 1rem; }
       .ai-welcome { text-align: center; padding: 0.5rem 0.25rem 0; }
       .ai-welcome h3 { margin: 0.75rem 0 0.3rem; font-size: 1.05rem; }
-      .ai-welcome > p { margin: 0 auto 1.1rem; max-width: 20rem; font-size: 0.84rem; color: var(--p-text-muted-color); }
+      .ai-welcome > p { margin: 0 auto 1.1rem; max-width: 21rem; font-size: 0.84rem; color: var(--p-text-muted-color); }
       .ai-thread { display: flex; flex-direction: column; gap: 0.85rem; }
 
       .ai-input { display: flex; align-items: flex-end; gap: 0.5rem; padding: 0.75rem; border-top: 1px solid var(--p-content-border-color); }
@@ -134,10 +179,10 @@ import { AiMessageComponent } from '../ai-message/ai-message';
       .ai-send:hover:not(:disabled) { filter: brightness(1.06); }
       .ai-send:disabled { opacity: 0.5; cursor: default; }
       .ai-send:focus-visible { outline: 2px solid var(--p-primary-color); outline-offset: 2px; }
-      .ai-foot { margin: 0; padding: 0 0.9rem 0.7rem; font-size: 0.66rem; color: var(--p-text-muted-color); text-align: center; }
+      .ai-foot { margin: 0; padding: 0 0.9rem 0.65rem; font-size: 0.65rem; color: var(--p-text-muted-color); text-align: center; }
 
       @media (max-width: 720px) {
-        .ai-panel { right: 0; left: 0; bottom: 0; width: 100%; height: 82vh; border-radius: 18px 18px 0 0; }
+        .ai-panel { right: 0; left: 0; bottom: 0; width: 100%; height: 85vh; border-radius: 18px 18px 0 0; }
         .ai-fab { right: 1rem; bottom: 1rem; }
         .ai-fab-label { display: none; }
       }

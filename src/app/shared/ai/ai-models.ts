@@ -1,7 +1,7 @@
 /**
  * Ask OMS — shared AI copilot models.
  *
- * The copilot follows an intent → structured-context → natural-language flow.
+ * The copilot follows an intent → structured-context → natural-language & block flow.
  * The *engine* (see intent-engine.ts) performs all calculation from real OMS
  * data; a pluggable {@link AiProvider} only rephrases the already-computed
  * result. No model ever calculates business metrics or sees raw records beyond
@@ -13,30 +13,192 @@ export type AiRole = 'user' | 'assistant';
 export type AiIntentKind =
   | 'reporting-hierarchy'
   | 'manager-of'
+  | 'team-hierarchy'
+  | 'reporting-chain'
   | 'contact-info'
   | 'person-attribute'
   | 'recent-hires'
   | 'join-roster'
   | 'department-stats'
   | 'department-head'
+  | 'department-scoped'
+  | 'company-scoped'
+  | 'multi-filter'
+  | 'comparison'
+  | 'data-quality'
   | 'positions-by-title'
   | 'vacancies'
   | 'find-employee'
   | 'insights'
   | 'activity-summary'
+  | 'my-profile'
+  | 'my-manager'
+  | 'my-team'
+  | 'my-department'
+  | 'my-reporting-chain'
+  | 'ambiguity'
   | 'how-to'
   | 'guide'
   | 'help'
   | 'unknown'
   | 'denied';
 
-/** A follow-up the user can take from an answer (navigate, focus the organogram). */
+/** A follow-up the user can take from an answer (navigate, focus the organogram, select candidate, ask prompt). */
 export interface AiAction {
-  kind: 'navigate' | 'focus-organogram';
+  kind: 'navigate' | 'focus-organogram' | 'select-context' | 'ask-prompt';
   label: string;
   icon: string;
   route?: string;
   staffId?: number;
+  deptId?: number;
+  companyId?: number;
+  prompt?: string;
+}
+
+/** Conversational context persisted within an Ask OMS session. */
+export interface AskOmsContext {
+  lastIntent?: AiIntentKind;
+  lastEntityType?: 'staff' | 'department' | 'company' | 'position' | 'vacancy';
+  staffId?: number | null;
+  staffName?: string | null;
+  departmentId?: number | null;
+  departmentName?: string | null;
+  companyId?: number | null;
+  companyName?: string | null;
+  positionId?: number | null;
+  resultStaffIds?: number[];
+  lastQuery?: string;
+  comparisonDeptId?: number | null;
+}
+
+// ---- Structured Entity Blocks ----
+
+export interface EmployeeBlock {
+  kind: 'employee';
+  id: number;
+  name: string;
+  title?: string | null;
+  employeeCode?: string | null;
+  departmentName?: string;
+  deptId?: number | null;
+  companyName?: string;
+  companyId?: number | null;
+  managerName?: string | null;
+  managerId?: number | null;
+  email?: string | null;
+  cellNumber?: string | null;
+  landline?: string | null;
+  status?: string;
+  dateJoined?: string | null;
+  directReportsCount?: number;
+  extendedTeamCount?: number;
+}
+
+export interface DepartmentBlock {
+  kind: 'department';
+  id: number;
+  name: string;
+  companyName?: string;
+  companyId?: number | null;
+  headName?: string | null;
+  headStaffId?: number | null;
+  employeeCount: number;
+  vacancyCount: number;
+  positionCount: number;
+}
+
+export interface PositionBlock {
+  kind: 'position';
+  id: number;
+  title: string;
+  departmentName?: string;
+  deptId?: number | null;
+  companyName?: string;
+  companyId?: number | null;
+  isVacant: boolean;
+  status: string;
+}
+
+export interface MetricComparisonItem {
+  id?: number;
+  name: string;
+  entityType: 'department' | 'company';
+  employeeCount: number;
+  vacancyCount?: number;
+  headName?: string | null;
+}
+
+export interface ComparisonBlock {
+  kind: 'comparison';
+  title: string;
+  itemA: MetricComparisonItem;
+  itemB: MetricComparisonItem;
+  differenceSummary: string;
+}
+
+export interface ReportingChainNode {
+  id: number;
+  name: string;
+  title?: string | null;
+  departmentName?: string;
+  level: number;
+  isTarget?: boolean;
+}
+
+export interface ReportingChainBlock {
+  kind: 'reporting-chain';
+  targetStaffName: string;
+  levelsAboveTarget: number;
+  nodes: ReportingChainNode[];
+}
+
+export interface AmbiguityCandidate {
+  id: number;
+  name: string;
+  employeeCode?: string | null;
+  title?: string | null;
+  departmentName?: string;
+  deptId?: number | null;
+  companyName?: string;
+  companyId?: number | null;
+}
+
+export interface AmbiguityBlock {
+  kind: 'ambiguity';
+  prompt: string;
+  candidates: AmbiguityCandidate[];
+}
+
+export interface DataQualityIssue {
+  id: number;
+  entityType: 'staff' | 'department' | 'position';
+  name: string;
+  issue: string;
+  route: string;
+  staffId?: number;
+}
+
+export interface DataQualityBlock {
+  kind: 'data-quality';
+  category: string;
+  summary: string;
+  totalIssues: number;
+  issues: DataQualityIssue[];
+}
+
+export type AskOmsBlock =
+  | EmployeeBlock
+  | DepartmentBlock
+  | PositionBlock
+  | ComparisonBlock
+  | ReportingChainBlock
+  | AmbiguityBlock
+  | DataQualityBlock;
+
+export interface AiSuggestion {
+  label: string;
+  query: string;
+  icon: string;
 }
 
 /** The outcome of interpreting one question. */
@@ -48,6 +210,9 @@ export interface AiResult {
   answer: string;
   actions: AiAction[];
   tone: 'normal' | 'denied' | 'empty' | 'error';
+  blocks?: AskOmsBlock[];
+  updatedContext?: Partial<AskOmsContext>;
+  suggestions?: AiSuggestion[];
 }
 
 export interface AiMessage {
@@ -55,14 +220,10 @@ export interface AiMessage {
   role: AiRole;
   text: string;
   actions?: AiAction[];
+  blocks?: AskOmsBlock[];
+  suggestions?: AiSuggestion[];
   tone?: AiResult['tone'];
   /** True while the assistant reply is streaming/being computed. */
   pending?: boolean;
   ts: number;
-}
-
-export interface AiSuggestion {
-  label: string;
-  query: string;
-  icon: string;
 }
