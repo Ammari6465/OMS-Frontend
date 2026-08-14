@@ -45,6 +45,11 @@ import { ThemeService } from '../../core/services/theme.service';
   `,
   styles: [
     `
+      :host {
+        display: block;
+        min-height: 100vh;
+        width: 100%;
+      }
       .auth-shell {
         display: grid;
         grid-template-columns: 1.05fr 1fr;

@@ -114,6 +114,10 @@ interface UiError {
   `,
   styles: [
     `
+      :host {
+        display: block;
+        width: 100%;
+      }
       .auth-head h2 {
         font-size: 1.6rem;
         margin: 0 0 0.35rem;

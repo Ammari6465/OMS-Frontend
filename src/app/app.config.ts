@@ -40,10 +40,6 @@ export const appConfig: ApplicationConfig = {
         preset: OmsPreset,
         options: {
           darkModeSelector: '.app-dark',
-          cssLayer: {
-            name: 'primeng',
-            order: 'theme, base, primeng',
-          },
         },
       },
       ripple: true,

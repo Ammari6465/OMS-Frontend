@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable, catchError, map, of, tap, throwError, timeout } from 'rxjs';
+import { Observable, catchError, map, of, shareReplay, tap, throwError, timeout } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api.model';
@@ -80,6 +80,8 @@ export class AuthService {
     }
   }
 
+  private init$?: Observable<void>;
+
   init(): Observable<void> {
     if (this.initialized()) {
       return of(void 0);
@@ -88,18 +90,22 @@ export class AuthService {
       this.initialized.set(true);
       return of(void 0);
     }
-    return this.loadCurrentUser().pipe(
-      // App initialisation waits for this request. Never leave the whole UI on
-      // a blank shell when the API is unavailable or a stored token is stale.
-      timeout(SESSION_RESTORE_TIMEOUT_MS),
-      map(() => void 0),
-      catchError(() => {
-        this.clearToken();
-        this._currentUser.set(null);
-        return of(void 0);
-      }),
-      tap(() => this.initialized.set(true)),
-    );
+    if (!this.init$) {
+      this.init$ = this.loadCurrentUser().pipe(
+        // App initialisation waits for this request. Never leave the whole UI on
+        // a blank shell when the API is unavailable or a stored token is stale.
+        timeout(SESSION_RESTORE_TIMEOUT_MS),
+        map(() => void 0),
+        catchError(() => {
+          this.clearToken();
+          this._currentUser.set(null);
+          return of(void 0);
+        }),
+        tap(() => this.initialized.set(true)),
+        shareReplay(1),
+      );
+    }
+    return this.init$;
   }
 
   login(request: LoginRequest, remember = false): Observable<CurrentUser> {
