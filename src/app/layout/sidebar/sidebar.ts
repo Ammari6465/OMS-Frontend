@@ -105,6 +105,10 @@ import { OmsStyleService } from '../../core/services/oms-style.service';
   `,
   styles: [
     `
+      :host {
+        display: block;
+        height: 100%;
+      }
       .sidebar {
         height: 100%;
         display: flex;

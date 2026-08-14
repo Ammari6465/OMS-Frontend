@@ -37,6 +37,11 @@ import { AskOmsPanel } from '../../shared/ai/ai-chat-panel/ask-oms-panel';
   `,
   styles: [
     `
+      :host {
+        display: block;
+        height: 100vh;
+        width: 100%;
+      }
       .layout {
         display: flex;
         height: 100vh;

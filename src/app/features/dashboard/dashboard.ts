@@ -216,6 +216,10 @@ import { AskOmsService } from '../../shared/ai/ask-oms.service';
   `,
   styles: [
     `
+      :host {
+        display: block;
+        width: 100%;
+      }
       .dash-header {
         display: flex;
         align-items: flex-end;

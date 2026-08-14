@@ -152,11 +152,46 @@
 }
 
 html,
-body {
+body,
+app-root {
   height: 100%;
   margin: 0;
   padding: 0;
   background: var(--oms-page-bg) !important;
+}
+
+app-root,
+app-main-layout,
+app-auth-layout,
+app-sidebar,
+app-topbar,
+app-dashboard,
+app-organogram-viewer,
+app-company-list,
+app-department-list,
+app-staff-list,
+app-position-list,
+app-vacancy-list,
+app-user-list,
+app-audit-log,
+app-notification-center,
+app-settings,
+app-profile {
+  display: block;
+}
+
+app-main-layout {
+  height: 100vh;
+  width: 100%;
+}
+
+app-sidebar {
+  height: 100%;
+}
+
+app-topbar,
+app-dashboard {
+  width: 100%;
 }
 
 body {

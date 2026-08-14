@@ -177,6 +177,10 @@ import { AskOmsService } from '../../shared/ai/ask-oms.service';
   `,
   styles: [
     `
+      :host {
+        display: block;
+        width: 100%;
+      }
       .topbar {
         height: var(--oms-topbar-height);
         display: flex;

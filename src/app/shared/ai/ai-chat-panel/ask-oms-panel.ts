@@ -74,7 +74,8 @@ import { AiMessageComponent } from '../ai-message/ai-message';
   `,
   styles: [
     `
-      :host { position: fixed; z-index: 1200; }
+      :host { position: fixed; inset: auto 0 0 auto; z-index: 1200; pointer-events: none; }
+      :host > * { pointer-events: auto; }
       .ai-fab {
         position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 1200;
         display: inline-flex; align-items: center; gap: 0.55rem; padding: 0.8rem 1.15rem;
