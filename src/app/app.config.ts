@@ -4,7 +4,15 @@ import {
   provideBrowserGlobalErrorListeners,
   inject,
 } from '@angular/core';
-import { provideRouter, withComponentInputBinding, withInMemoryScrolling, withViewTransitions } from '@angular/router';
+import {
+  RedirectCommand,
+  Router,
+  provideRouter,
+  withComponentInputBinding,
+  withInMemoryScrolling,
+  withNavigationErrorHandler,
+  withViewTransitions,
+} from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { providePrimeNG } from 'primeng/config';
 import { MessageService, ConfirmationService } from 'primeng/api';
@@ -28,10 +36,29 @@ export const appConfig: ApplicationConfig = {
       withViewTransitions({
         skipInitialTransition: true,
         onViewTransitionCreated: ({ transition, from, to }) => {
+          // A redirect chain interrupts the transition it started; the aborted
+          // one then rejects with InvalidStateError as an unhandled rejection.
+          transition.finished.catch(() => {});
+          transition.updateCallbackDone.catch(() => {});
+          transition.ready.catch(() => {});
+
           const isAuthBoundary = (route: typeof from): boolean =>
             route.pathFromRoot.some((ancestor) => ancestor.routeConfig?.path === 'auth');
           if (isAuthBoundary(from) || isAuthBoundary(to)) transition.skipTransition();
         },
+      }),
+      // A navigation that dies mid-flight (failed lazy chunk, guard throwing,
+      // a cancelled redirect) activates nothing and leaves a blank page. Send
+      // the user somewhere real instead of stranding them on an empty outlet.
+      withNavigationErrorHandler((error) => {
+        console.error('[router] navigation failed', error);
+        const router = inject(Router);
+        const auth = inject(AuthService);
+        // Must be a RedirectCommand — a bare UrlTree is ignored by the router.
+        return new RedirectCommand(
+          router.parseUrl(auth.isAuthenticated() ? '/dashboard' : '/auth/login'),
+          { replaceUrl: true },
+        );
       }),
     ),
     provideHttpClient(withInterceptors([authInterceptor, errorInterceptor])),

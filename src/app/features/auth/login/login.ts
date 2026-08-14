@@ -333,8 +333,6 @@ export class Login implements AfterViewInit {
 
     this.auth.login({ username, password }, rememberMe).subscribe({
       next: () => {
-        this.org.init().subscribe({ error: () => {} });
-        this.notifications.init().subscribe({ error: () => {} });
         this.completeLogin();
       },
       error: (err: AuthError | unknown) => {
@@ -354,7 +352,16 @@ export class Login implements AfterViewInit {
 
   private completeLogin(): void {
     const target = this.safeRedirect(this.route.snapshot.queryParamMap.get('redirect'));
-    void this.router.navigateByUrl(target).finally(() => this.loading.set(false));
+    void this.router
+      .navigateByUrl(target)
+      .then(() => {
+        // Warm the shared caches only once we have landed. Started any earlier,
+        // a 401 from one of these would sign the user back out mid-navigation
+        // and strand the router between the login page and the dashboard.
+        this.org.init().subscribe({ error: () => {} });
+        this.notifications.init().subscribe({ error: () => {} });
+      })
+      .finally(() => this.loading.set(false));
   }
 
   /** Only allow internal absolute paths; block open-redirects to external URLs. */

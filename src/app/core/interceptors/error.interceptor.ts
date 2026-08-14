@@ -29,8 +29,11 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
           });
           break;
         case 401:
-          if (!isAuthEndpoint) {
-            auth.logout();
+          // Only tear down a session that actually exists. A 401 arriving while
+          // signed out (or from a request that outlived the sign-out) must not
+          // start a navigation that races the one already in progress.
+          if (!isAuthEndpoint && auth.isAuthenticated()) {
+            auth.logout('session-expired');
             messages.add({
               severity: 'warn',
               summary: 'Session expired',

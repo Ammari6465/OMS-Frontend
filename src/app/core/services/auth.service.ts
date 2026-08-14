@@ -114,6 +114,9 @@ export class AuthService {
       tap((response) => {
         this.persistSession(response.token, response.user, remember);
         this._currentUser.set(response.user);
+        // A fresh login is a fully resolved session. Without this, a guard that
+        // runs before init() ever completed would re-enter the /auth/me probe.
+        this.initialized.set(true);
       }),
       map((response) => response.user),
       catchError((error: HttpErrorResponse) => {
@@ -172,10 +175,23 @@ export class AuthService {
     return this.http.post<ApiResponse<void>>(`${this.baseUrl}/reset-password`, request).pipe(map(() => void 0));
   }
 
-  logout(): void {
+  /**
+   * Clears the session and returns to login.
+   *
+   * Idempotent: calling it while already signed out only clears storage and
+   * does not navigate. Several requests can fail with 401 at once (the shell
+   * fires a batch of them on load), and each competing router.navigate() would
+   * cancel the one in flight, leaving the outlet with nothing activated.
+   */
+  logout(reason?: 'session-expired'): void {
+    const hadSession = this._currentUser() !== null;
     this.clearToken();
     this._currentUser.set(null);
-    this.router.navigate(['/auth/login']);
+    if (!hadSession) return;
+    void this.router.navigate(['/auth/login'], {
+      queryParams: reason ? { reason } : {},
+      replaceUrl: true,
+    });
   }
 
   hasRole(role: Role): boolean {
