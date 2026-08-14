@@ -24,6 +24,8 @@ export type AiIntentKind =
   | 'find-employee'
   | 'insights'
   | 'activity-summary'
+  | 'how-to'
+  | 'guide'
   | 'help'
   | 'unknown'
   | 'denied';

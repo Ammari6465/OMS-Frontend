@@ -449,7 +449,8 @@ export class OrganogramViewer implements OnInit {
   }
 
   initials(name: string): string {
-    const p = name.trim().split(/\s+/);
+    const clean = name.replace(/^(dr\.|dr|mr\.|mr|mrs\.|mrs|ms\.|ms|prof\.|prof|eng\.|eng|sir|rev\.|rev)\s+/i, '').trim();
+    const p = clean.split(/\s+/);
     return ((p[0]?.[0] ?? '') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase();
   }
 

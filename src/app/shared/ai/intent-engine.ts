@@ -45,9 +45,9 @@ const STOP_WORDS = new Set([
   'person', 'people', 'my', 'their', 'for', 'under', 'works', 'work', 'about', 'tell', 'can', 'you', 'please',
 ]);
 
-/** Lower-cased alphanumeric words of a name, stripping punctuation like "Dr.". */
+/** Lower-cased alphanumeric words of a name, stripping honorific prefixes. */
 function nameWords(name: string): string[] {
-  return name.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  return name.replace(/^(dr\.|dr|mr\.|mr|mrs\.|mrs|ms\.|ms|prof\.|prof|eng\.|eng|sir|rev\.|rev)\s+/i, '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
 }
 
 /**
@@ -95,7 +95,7 @@ function matchDepartment(query: string, departments: Department[]): Department |
 
 const focusAction = (s: Staff): AiAction => ({
   kind: 'focus-organogram',
-  label: `Show ${firstName(s.name)} in the Organogram`,
+  label: `Show ${s.name} in the Organogram`,
   icon: 'pi pi-sitemap',
   staffId: s.id,
 });
@@ -435,14 +435,165 @@ function generateInsights(ctx: AiDataContext): AiResult {
   };
 }
 
+function guideAddStaff(): AiResult {
+  return {
+    intent: 'how-to',
+    context: { topic: 'add-staff' },
+    answer:
+      `Here is the step-by-step guide to add a new staff member to OMS:\n\n` +
+      `1. Open Staff Directory:\n` +
+      `   Click "Open Staff directory" below or choose Staff from the sidebar.\n\n` +
+      `2. Launch the Add Staff Form:\n` +
+      `   Click the "+ Add Staff" button in the top-right toolbar.\n\n` +
+      `3. Assign Company & Department:\n` +
+      `   Select the operating entity and division.\n\n` +
+      `4. Enter Employee Information:\n` +
+      `   Fill in Full Name, Job Title / Designation, and Contact details (Email, Landline, Mobile).\n\n` +
+      `5. Set Reporting Manager:\n` +
+      `   Select their supervisor from the "Reports To" dropdown to place them directly in the Organogram hierarchy.\n\n` +
+      `6. Save:\n` +
+      `   Click "Save Staff" — the Organogram tree and company directories update instantly.`,
+    actions: [
+      { kind: 'navigate', label: 'Open Staff directory', icon: 'pi pi-users', route: '/staff' },
+      { kind: 'navigate', label: 'Open Organogram', icon: 'pi pi-sitemap', route: '/organogram' },
+    ],
+    tone: 'normal',
+  };
+}
+
+function guideAddCompany(): AiResult {
+  return {
+    intent: 'how-to',
+    context: { topic: 'add-company' },
+    answer:
+      `Here is how to register a new group company/entity:\n\n` +
+      `1. Open the Companies page from the sidebar menu.\n` +
+      `2. Click the "+ Add Company" button in the top toolbar.\n` +
+      `3. Enter the Company Name, Registration Code (e.g. REG-01), and Head Office address.\n` +
+      `4. Set the operational status to Active and click "Save Company".\n` +
+      `5. Once registered, you can assign departments and staff to this entity.`,
+    actions: [
+      { kind: 'navigate', label: 'Open Companies', icon: 'pi pi-building', route: '/companies' },
+    ],
+    tone: 'normal',
+  };
+}
+
+function guideAddDepartment(): AiResult {
+  return {
+    intent: 'how-to',
+    context: { topic: 'add-department' },
+    answer:
+      `Here is how to create a new department:\n\n` +
+      `1. Open Departments from the main sidebar.\n` +
+      `2. Click the "+ Add Department" button.\n` +
+      `3. Select the parent Company and enter the Department Name and Description.\n` +
+      `4. Designate a Department Head (Manager) from your staff list.\n` +
+      `5. Click "Save Department" to structure reporting teams under this division.`,
+    actions: [
+      { kind: 'navigate', label: 'Open Departments', icon: 'pi pi-briefcase', route: '/departments' },
+    ],
+    tone: 'normal',
+  };
+}
+
+function guideAddVacancy(): AiResult {
+  return {
+    intent: 'how-to',
+    context: { topic: 'add-vacancy' },
+    answer:
+      `Here is how to create and manage an open vacancy:\n\n` +
+      `1. Navigate to Open Vacancies in the sidebar.\n` +
+      `2. Click the "+ Add Position" button in the upper toolbar.\n` +
+      `3. Specify the Position Title, Company, and Department.\n` +
+      `4. Check "Mark as Vacant" and set the Status to "OPEN".\n` +
+      `5. Save — the position will be displayed on both the Organogram tree and Vacancies board.`,
+    actions: [
+      { kind: 'navigate', label: 'Open Vacancies', icon: 'pi pi-inbox', route: '/vacancies' },
+      { kind: 'navigate', label: 'Open Organogram', icon: 'pi pi-sitemap', route: '/organogram' },
+    ],
+    tone: 'normal',
+  };
+}
+
+function guideChangeManager(): AiResult {
+  return {
+    intent: 'how-to',
+    context: { topic: 'change-manager' },
+    answer:
+      `You can reassign reporting lines in two quick ways:\n\n` +
+      `• Method 1 (Interactive Drag & Drop in Organogram):\n` +
+      `  Open the Organogram Tree Viewer, click & drag any employee card, and drop it directly onto their new manager's card. The hierarchy updates immediately with cycle-prevention safety.\n\n` +
+      `• Method 2 (Staff Directory):\n` +
+      `  Go to Staff Directory, click "Edit" on the employee, choose their new manager in the "Reports To" dropdown, and click Save.`,
+    actions: [
+      { kind: 'navigate', label: 'Open Organogram', icon: 'pi pi-sitemap', route: '/organogram' },
+      { kind: 'navigate', label: 'Open Staff directory', icon: 'pi pi-users', route: '/staff' },
+    ],
+    tone: 'normal',
+  };
+}
+
+function guideExportOrganogram(): AiResult {
+  return {
+    intent: 'how-to',
+    context: { topic: 'export-organogram' },
+    answer:
+      `Here is how to export the Organogram structure:\n\n` +
+      `1. Open the Organogram Tree Viewer.\n` +
+      `2. In the top-right toolbar, click the Export Organogram button (download icon).\n` +
+      `3. A dedicated printable high-resolution document opens in a new tab where you can save as PDF, PNG, or print directly.`,
+    actions: [
+      { kind: 'navigate', label: 'Open Organogram', icon: 'pi pi-sitemap', route: '/organogram' },
+    ],
+    tone: 'normal',
+  };
+}
+
+function guideWritingStyle(): AiResult {
+  return {
+    intent: 'how-to',
+    context: { topic: 'writing-style' },
+    answer:
+      `To customize OMS Typography & Writing Style:\n\n` +
+      `1. In the top header bar, click the OMS Writing Badge or the Palette icon.\n` +
+      `2. Select your preferred typography preset (Modern Clean, Orbitron Futuristic, Corporate Pro, Neon Tech, Minimalist Mono, or Elegant Serif).\n` +
+      `3. Click any style card — your choice applies across the entire application instantly.`,
+    actions: [],
+    tone: 'normal',
+  };
+}
+
+function guideAuditLog(): AiResult {
+  return {
+    intent: 'how-to',
+    context: { topic: 'audit-log' },
+    answer:
+      `To review governance and audit logs:\n\n` +
+      `1. Go to Audit Logs in the main sidebar menu.\n` +
+      `2. Review timestamped records of every creation, edit, deletion, and reporting line transfer.\n` +
+      `3. Use the filters to filter by Entity Type (Staff, Department, Company, Position) or Action (Create, Update, Delete).`,
+    actions: [
+      { kind: 'navigate', label: 'Open Audit Log', icon: 'pi pi-history', route: '/audit' },
+    ],
+    tone: 'normal',
+  };
+}
+
 function helpResult(): AiResult {
   return {
     intent: 'help',
     context: {},
     answer:
-      'I can answer questions about your organisation using live OMS data. Try:\n' +
-      '• Who reports to <name>?\n• Which department has the most employees?\n' +
-      '• Show open vacancies\n• Who joined this month?\n• Find <name> in the Organogram\n• Summarise today’s activity',
+      'I can answer questions and provide guides for your organisation. Try:\n' +
+      '• Guide me how to add a staff\n' +
+      '• Who reports to <name>?\n' +
+      '• Which department has the most employees?\n' +
+      '• Show open vacancies\n' +
+      '• Who joined this month?\n' +
+      '• How to change reporting line?\n' +
+      '• Find <name> in the Organogram\n' +
+      '• Summarise today’s activity',
     actions: [],
     tone: 'normal',
   };
@@ -469,6 +620,70 @@ export function interpret(rawQuery: string, ctx: AiDataContext): AiResult {
   }
 
   const q = query.toLowerCase();
+  const normalized = q.replace(/[?!.,;:'"“”]/g, ' ').replace(/\s+/g, ' ').trim();
+  const isGuide = /\b(guide|how|steps|where|teach|tutorial|instructions|walkthrough|explain|show me how|way to|can i|how do i|how to)\b/i.test(normalized);
+
+  // How to add / onboard staff
+  if (
+    (isGuide && /\b(staff|employee|employees|person|people|member|user|worker|hire|onboard)\b/i.test(normalized)) ||
+    /\b(add|create|onboard|register|new)\s+(the\s+|a\s+|an\s+|new\s+)?(staff|employee|person|user|member)\b/i.test(normalized)
+  ) {
+    return guideAddStaff();
+  }
+
+  // How to add company
+  if (
+    (isGuide && /\b(company|companies|entity|entities|firm|subsidiary|organization|organisation)\b/i.test(normalized)) ||
+    /\b(add|create|register)\s+(the\s+|a\s+|an\s+|new\s+)?(company|entity)\b/i.test(normalized)
+  ) {
+    return guideAddCompany();
+  }
+
+  // How to add department
+  if (
+    (isGuide && /\b(department|dept|division|team|unit)\b/i.test(normalized)) ||
+    /\b(add|create)\s+(the\s+|a\s+|an\s+|new\s+)?(department|dept|division)\b/i.test(normalized)
+  ) {
+    return guideAddDepartment();
+  }
+
+  // How to create vacancy
+  if (
+    (isGuide && /\b(vacancy|vacancies|job|position|opening|hiring)\b/i.test(normalized)) ||
+    /\b(add|create|post)\s+(the\s+|a\s+|an\s+|new\s+)?(vacancy|position|job)\b/i.test(normalized)
+  ) {
+    return guideAddVacancy();
+  }
+
+  // How to change manager / reporting line
+  if (
+    (isGuide && /\b(reporting|manager|supervisor|reassign|transfer|drag|move|hierarchy)\b/i.test(normalized)) ||
+    /\b(change|update|reassign|move)\s+(the\s+)?(manager|reporting|supervisor|reporting line)\b/i.test(normalized)
+  ) {
+    return guideChangeManager();
+  }
+
+  // How to export organogram
+  if (
+    (isGuide && /\b(export|download|print|save|pdf|png)\b/i.test(normalized)) ||
+    /\b(export|download|print)\s+(the\s+)?(organogram|chart|tree|hierarchy)\b/i.test(normalized)
+  ) {
+    return guideExportOrganogram();
+  }
+
+  // How to change writing style
+  if (
+    isGuide && /\b(style|font|typography|theme|appearance|writing)\b/i.test(normalized)
+  ) {
+    return guideWritingStyle();
+  }
+
+  // How to view audit log
+  if (
+    isGuide && /\b(audit|history|log|logs|trail|governance|tracking)\b/i.test(normalized)
+  ) {
+    return guideAuditLog();
+  }
 
   // Reporting hierarchy / direct reports
   if (/\breport(s|ing)?\b|\bdirect reports?\b|\bteam of\b|\bwho works (for|under)\b/.test(q) && !/report\s+(a|an|the)?\s*(bug|issue)/.test(q)) {

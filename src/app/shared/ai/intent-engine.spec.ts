@@ -132,6 +132,15 @@ describe('Ask OMS intent engine', () => {
     expect(r.answer.toLowerCase()).toContain('permission');
   });
 
+  it('provides step-by-step guidance for adding staff', () => {
+    for (const q of ['Guide me How to add staff', 'Guide me How to add the staff', 'Guide me How to Add a Staff', 'How do I add an employee?']) {
+      const r = interpret(q, ctx);
+      expect(r.intent).toBe('how-to');
+      expect(r.answer).toContain('step-by-step guide to add a new staff');
+      expect(r.actions.some((a) => a.route === '/staff')).toBe(true);
+    }
+  });
+
   it('disambiguates when a first name matches multiple people', () => {
     const two = { ...ctx, staff: [...staff, { id: 5, companyId: 10, name: 'John Baker', deptId: 200, empType: EmploymentType.PERMANENT, status: EntityStatus.ACTIVE, isDeleted: false, version: 1 } as Staff] };
     const r = interpret('Find John', two);
