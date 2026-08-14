@@ -6,10 +6,11 @@ export interface LoginRequest {
 }
 
 /** Codes the mock (and later the real API) can surface to the login UI. */
-export type AuthErrorCode = 'INVALID_CREDENTIALS' | 'INACTIVE' | 'GENERIC';
+export type AuthErrorCode = 'INVALID_CREDENTIALS' | 'INACTIVE' | 'LOCKED' | 'GENERIC';
 
 export interface AuthError {
   code: AuthErrorCode;
+  message?: string;
 }
 
 export interface CurrentUser {

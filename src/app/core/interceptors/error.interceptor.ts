@@ -36,12 +36,6 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
               summary: 'Session expired',
               detail: 'Please sign in again.',
             });
-          } else {
-            messages.add({
-              severity: 'error',
-              summary: 'Sign-in failed',
-              detail: backendMessage ?? 'Invalid username or password.',
-            });
           }
           break;
         case 403:

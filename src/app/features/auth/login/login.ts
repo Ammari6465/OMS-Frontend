@@ -265,7 +265,11 @@ export class Login implements AfterViewInit {
       summary: 'Account inactive',
       detail: 'Your account is currently inactive. Please contact your administrator.',
     },
-    GENERIC: { summary: 'Something went wrong', detail: 'Please try again.' },
+    LOCKED: {
+      summary: 'Account locked',
+      detail: 'Your account is locked due to repeated failed login attempts. Please try again later.',
+    },
+    GENERIC: { summary: 'Something went wrong', detail: 'Please check your connection and try again.' },
   };
 
   readonly form = this.fb.nonNullable.group({
@@ -335,8 +339,15 @@ export class Login implements AfterViewInit {
       },
       error: (err: AuthError | unknown) => {
         this.loading.set(false);
-        const code = (err as AuthError)?.code ?? 'GENERIC';
-        this.error.set(this.errorMap[code] ?? this.errorMap.GENERIC);
+        const authErr = err as AuthError;
+        const code = authErr?.code ?? 'GENERIC';
+        const baseErr = this.errorMap[code] ?? this.errorMap.GENERIC;
+        const message = authErr?.message;
+        const detail = message && message !== baseErr.summary ? message : baseErr.detail;
+        this.error.set({
+          summary: baseErr.summary,
+          detail,
+        });
       },
     });
   }

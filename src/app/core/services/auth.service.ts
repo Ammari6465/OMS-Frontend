@@ -7,6 +7,7 @@ import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api.model';
 import {
   AuthError,
+  AuthErrorCode,
   ChangePasswordError,
   ChangePasswordRequest,
   CurrentUser,
@@ -101,8 +102,19 @@ export class AuthService {
       }),
       map((response) => response.user),
       catchError((error: HttpErrorResponse) => {
-        const isCredentialErr = error.status === 401 || error.status === 400;
-        return throwError(() => ({ code: isCredentialErr ? 'INVALID_CREDENTIALS' : 'GENERIC' } as AuthError));
+        const serverMessage = error.error?.message as string | undefined;
+        let code: AuthErrorCode = 'GENERIC';
+
+        if (error.status === 423) {
+          code = 'LOCKED';
+        } else if (error.status === 401 || error.status === 400) {
+          if (serverMessage?.toLowerCase().includes('deactivat')) {
+            code = 'INACTIVE';
+          } else {
+            code = 'INVALID_CREDENTIALS';
+          }
+        }
+        return throwError(() => ({ code, message: serverMessage } as AuthError));
       }),
     );
   }
