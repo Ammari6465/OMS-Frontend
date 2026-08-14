@@ -1,7 +1,7 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable, catchError, map, of, tap, throwError } from 'rxjs';
+import { Observable, catchError, map, of, tap, throwError, timeout } from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api.model';
@@ -19,6 +19,8 @@ import {
 } from '../models/auth.model';
 import { Role } from '../models/enums';
 import { DEMO_USER_KEY } from './demo-accounts';
+
+const SESSION_RESTORE_TIMEOUT_MS = 10_000;
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -87,9 +89,13 @@ export class AuthService {
       return of(void 0);
     }
     return this.loadCurrentUser().pipe(
+      // App initialisation waits for this request. Never leave the whole UI on
+      // a blank shell when the API is unavailable or a stored token is stale.
+      timeout(SESSION_RESTORE_TIMEOUT_MS),
       map(() => void 0),
       catchError(() => {
         this.clearToken();
+        this._currentUser.set(null);
         return of(void 0);
       }),
       tap(() => this.initialized.set(true)),

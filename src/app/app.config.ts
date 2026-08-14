@@ -16,7 +16,7 @@ import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { AuthService } from './core/services/auth.service';
 import { OrgDataService } from './core/data/org-data.service';
 import { NotificationService } from './core/data/notification.service';
-import { catchError, forkJoin, map, of, switchMap, tap } from 'rxjs';
+import { catchError, of, tap } from 'rxjs';
 
 export const appConfig: ApplicationConfig = {
   providers: [

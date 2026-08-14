@@ -56,6 +56,23 @@ describe('AuthService API workflows', () => {
     expect(localStorage.getItem(environment.tokenStorageKey)).toBe('jwt-token');
   });
 
+  it('abandons a stalled session restore instead of blocking app startup', async () => {
+    vi.useFakeTimers();
+    localStorage.setItem(environment.tokenStorageKey, 'stale-token');
+
+    const result = firstValueFrom(service.init());
+    const request = http.expectOne(`${environment.apiUrl}/auth/me`);
+
+    await vi.advanceTimersByTimeAsync(10_001);
+
+    await expect(result).resolves.toBeUndefined();
+    expect(request.cancelled).toBe(true);
+    expect(service.initialized()).toBe(true);
+    expect(service.isAuthenticated()).toBe(false);
+    expect(localStorage.getItem(environment.tokenStorageKey)).toBeNull();
+    vi.useRealTimers();
+  });
+
   it('updates profile and changes password through the backend', async () => {
     const profile = { ...user, fullName: 'Updated Administrator', email: 'updated@sunrichgroup.com' };
     const profileResult = firstValueFrom(service.updateProfile({ fullName: profile.fullName, email: profile.email }));
