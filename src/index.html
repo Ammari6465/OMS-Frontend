@@ -12,6 +12,84 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Orbitron:wght@600;800;900&family=Outfit:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@700;800&family=Space+Grotesk:wght@600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-  <app-root></app-root>
+  <!--
+    Rendering is blocked until the app initializer resolves the session against
+    the remote API. Angular clears app-root's children when it creates the
+    component, so this placeholder covers exactly that window instead of
+    leaving a blank page with no feedback (and no clue) when the API is slow.
+  -->
+  <app-root>
+    <div class="oms-boot" role="status" aria-live="polite">
+      <div class="oms-boot__spinner"></div>
+      <p class="oms-boot__label">Loading Sunrich OMS…</p>
+      <div class="oms-boot__stuck">
+        <p class="oms-boot__hint">This is taking longer than expected — the server may be slow to wake.</p>
+        <a class="oms-boot__action" href="/dashboard">Reload</a>
+        <a class="oms-boot__action oms-boot__action--muted" href="/auth/login">Sign in again</a>
+      </div>
+    </div>
+  </app-root>
+  <style>
+    .oms-boot {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      background: #0b1120;
+      color: #94a3b8;
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+      text-align: center;
+      padding: 1.5rem;
+    }
+    .oms-boot__spinner {
+      width: 34px;
+      height: 34px;
+      border: 3px solid rgba(148, 163, 184, 0.25);
+      border-top-color: #0f8bfd;
+      border-radius: 50%;
+      animation: oms-boot-spin 0.8s linear infinite;
+    }
+    .oms-boot__label { margin: 0; font-size: 0.9rem; font-weight: 600; }
+    /*
+      Only appears once the wait is clearly abnormal. A stuck session restore
+      used to leave the user on a dead page with no way forward; these give
+      them one without needing devtools.
+    */
+    .oms-boot__stuck {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.75rem;
+      opacity: 0;
+      visibility: hidden;
+      animation: oms-boot-stuck 0s linear 12s forwards;
+    }
+    .oms-boot__hint { margin: 0; font-size: 0.78rem; max-width: 34ch; line-height: 1.5; }
+    .oms-boot__action {
+      display: inline-block;
+      padding: 0.5rem 1.4rem;
+      border-radius: 7px;
+      background: #0f8bfd;
+      color: #fff;
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .oms-boot__action--muted {
+      background: transparent;
+      color: #94a3b8;
+      text-decoration: underline;
+      padding: 0;
+      font-weight: 500;
+    }
+    @keyframes oms-boot-spin { to { transform: rotate(360deg); } }
+    @keyframes oms-boot-stuck { to { opacity: 1; visibility: visible; } }
+    @media (prefers-reduced-motion: reduce) {
+      .oms-boot__spinner { animation-duration: 2.4s; }
+    }
+  </style>
 </body>
 </html>

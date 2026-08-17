@@ -1,7 +1,18 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { Observable, catchError, map, of, shareReplay, tap, throwError, timeout } from 'rxjs';
+import {
+  Observable,
+  catchError,
+  map,
+  of,
+  retry,
+  shareReplay,
+  tap,
+  throwError,
+  timeout,
+  timer,
+} from 'rxjs';
 
 import { environment } from '../../../environments/environment';
 import { ApiResponse } from '../models/api.model';
@@ -21,6 +32,15 @@ import { Role } from '../models/enums';
 import { DEMO_USER_KEY } from './demo-accounts';
 
 const SESSION_RESTORE_TIMEOUT_MS = 10_000;
+const SESSION_RESTORE_RETRIES = 2;
+
+/**
+ * True only when the server explicitly rejected the credentials. Everything
+ * else (timeout, offline, 5xx) leaves the stored token's validity unknown.
+ */
+function isRejectedSession(error: unknown): boolean {
+  return error instanceof HttpErrorResponse && (error.status === 401 || error.status === 403);
+}
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
@@ -95,10 +115,23 @@ export class AuthService {
         // App initialisation waits for this request. Never leave the whole UI on
         // a blank shell when the API is unavailable or a stored token is stale.
         timeout(SESSION_RESTORE_TIMEOUT_MS),
+        // The API is remote and can be slow to wake, so a first attempt that
+        // times out says nothing about the token. Retry before concluding
+        // anything; a definitive rejection short-circuits immediately.
+        retry({
+          count: SESSION_RESTORE_RETRIES,
+          delay: (error, attempt) =>
+            isRejectedSession(error) ? throwError(() => error) : timer(attempt * 750),
+        }),
         map(() => void 0),
-        catchError(() => {
-          this.clearToken();
-          this._currentUser.set(null);
+        catchError((error: unknown) => {
+          // Only the server saying "this token is no good" may destroy the
+          // session. A timeout or an offline blip previously wiped a perfectly
+          // valid token, logging the user out and stranding them on login.
+          if (isRejectedSession(error)) {
+            this.clearToken();
+            this._currentUser.set(null);
+          }
           return of(void 0);
         }),
         tap(() => this.initialized.set(true)),
