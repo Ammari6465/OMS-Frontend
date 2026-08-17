@@ -187,6 +187,24 @@ describe('Ask OMS — employee and manager phrasings', () => {
     expect(r.answer).toContain('Sarah Khan');
   });
 
+  it('recognises natural job-title questions with spelling mistakes', () => {
+    const seniorDeveloper = {
+      ...staff[2],
+      id: 50,
+      name: 'Eleanor Vance',
+      employeeCode: 'EMP-050',
+      title: 'Senior Developer',
+    } as Staff;
+    const titleContext: AiDataContext = { ...ctx, staff: [...ctx.staff, seniorDeveloper] };
+
+    for (const question of ['Who is a Senir Developer?', 'Who is the Senior Developer?', 'Find senior developer']) {
+      const result = interpret(question, titleContext);
+      expect(result.intent).toBe('positions-by-title');
+      expect(result.answer).toContain('Eleanor Vance');
+      expect(result.answer).toContain('Senior Developer');
+    }
+  });
+
   it('asks for an identifier when no one is named', () => {
     const r = interpret('Find an employee', ctx);
     expect(r.intent).toBe('find-employee');

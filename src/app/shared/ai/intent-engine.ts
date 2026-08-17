@@ -21,7 +21,7 @@ import {
   VacancySummaryBlock,
 } from './ai-models';
 import { CONFIDENCE, bestIntent, detectSmallTalk, isCapabilityQuery } from './intent-classifier';
-import { NormalizedQuery, normalizeQuery } from './query-normalizer';
+import { NormalizedQuery, fuzzyEquals, normalizeQuery } from './query-normalizer';
 import {
   CHAIN_TERMS,
   CONTACT_TERMS,
@@ -1254,9 +1254,20 @@ function isDirectReportsQuery(text: string): boolean {
  * queries short enough to plausibly *be* a title, so a long sentence never
  * matches a person because it happens to contain the word "Director".
  */
+function extractTitlePhrase(text: string): string {
+  return text
+    .trim()
+    .replace(/^(?:who|which)\s+(?:is|are)\s+(?:(?:a|an|the)\s+)?/, '')
+    .replace(/^(?:find|show|list|locate)\s+(?:me\s+)?(?:(?:a|an|the)\s+)?/, '')
+    .replace(/\b(?:employee|employees|person|people)\s+(?:who|that)\s+(?:is|are|works?)\s+(?:(?:a|an|the)\s+)?/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function matchStaffByTitle(text: string, ctx: AiDataContext): Staff[] {
-  const phrase = text.trim();
-  if (phrase.length < 4 || phrase.split(/\s+/).length > 5) return [];
+  const phrase = extractTitlePhrase(text);
+  const phraseTokens = phrase.split(/\s+/).filter(Boolean);
+  if (phrase.length < 4 || phraseTokens.length > 4) return [];
 
   const exact = ctx.staff.filter((s) => (s.title ?? '').toLowerCase() === phrase);
   if (exact.length) return exact;
@@ -1264,8 +1275,18 @@ function matchStaffByTitle(text: string, ctx: AiDataContext): Staff[] {
   return ctx.staff.filter((s) => {
     const title = (s.title ?? '').toLowerCase();
     if (title.length < 4) return false;
-    return title.includes(phrase) || phrase.includes(title);
+    if (title.includes(phrase) || phrase.includes(title)) return true;
+
+    const titleTokens = title.split(/[^a-z0-9]+/).filter(Boolean);
+    return phraseTokens.every((queryToken) =>
+      titleTokens.some((titleToken) => fuzzyEquals(queryToken, titleToken)),
+    );
   });
+}
+
+function resolvedTitleLabel(matches: Staff[], text: string): string {
+  const distinctTitles = Array.from(new Set(matches.map((s) => s.title).filter((title): title is string => !!title)));
+  return distinctTitles.length === 1 ? distinctTitles[0] : extractTitlePhrase(text);
 }
 
 /** True when the query asks to search staff but names nobody in particular. */
@@ -1771,7 +1792,7 @@ export function interpret(rawQuery: string, ctx: AiDataContext): AiResult {
 
   // 17. Job-title search: "Operations Manager", "Senior Engineer"
   const titleHits = matchStaffByTitle(normalized, ctx);
-  if (titleHits.length) return titleSearchResult(titleHits, normalized, ctx);
+  if (titleHits.length) return titleSearchResult(titleHits, resolvedTitleLabel(titleHits, normalized), ctx);
 
   // 17b. "Find an employee" with no identifier — ask for one instead of guessing.
   if (isBareEmployeeSearch(nq)) return employeeSearchPrompt();
