@@ -41,6 +41,14 @@ describe('OrganogramViewer Component UI & Interactions', () => {
     version: 1,
   };
 
+  const departedEmployee: Staff = {
+    ...mockEmployee,
+    id: 3,
+    name: 'Former Employee',
+    status: EntityStatus.ACTIVE,
+    dateLeft: '2020-01-01',
+  };
+
   beforeEach(async () => {
     orgDataMock = {
       companies: { snapshot: vi.fn().mockReturnValue([{ id: 10, name: 'Sunrich Global' }]) },
@@ -49,7 +57,7 @@ describe('OrganogramViewer Component UI & Interactions', () => {
       departmentOptions: signal([]),
       departmentName: vi.fn().mockReturnValue('Technology'),
       staff: {
-        snapshot: vi.fn().mockReturnValue([mockManager, mockEmployee]),
+        snapshot: vi.fn().mockReturnValue([mockManager, mockEmployee, departedEmployee]),
         update: vi.fn(),
       },
       positions: { snapshot: vi.fn().mockReturnValue([]) },
@@ -76,6 +84,11 @@ describe('OrganogramViewer Component UI & Interactions', () => {
     expect(component.roots()[0].staff.name).toBe('Chief Executive');
     expect(component.roots()[0].children.length).toBe(1);
     expect(component.roots()[0].children[0].staff.name).toBe('Dev Lead');
+  });
+
+  it('[POSITIVE] excludes employees whose leaving date has passed', () => {
+    const names = component.roots().flatMap((root) => [root.staff.name, ...root.children.map((child) => child.staff.name)]);
+    expect(names).not.toContain('Former Employee');
   });
 
   it('[POSITIVE] zoomBy updates zoom scale within 25% to 200% limits', () => {

@@ -368,7 +368,10 @@ export class OrganogramViewer implements OnInit {
     this.refresh();
     const cid = this.companyId();
     if (cid == null) return [];
-    return this.org.staff.snapshot().filter((s) => s.companyId === cid);
+    const today = new Date().toISOString().slice(0, 10);
+    return this.org.staff.snapshot().filter((s) =>
+      s.companyId === cid && s.status === 'ACTIVE' && (!s.dateLeft || s.dateLeft > today),
+    );
   });
 
   readonly roots = computed<OrgNode[]>(() => {
