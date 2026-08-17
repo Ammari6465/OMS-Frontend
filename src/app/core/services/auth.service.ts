@@ -31,8 +31,10 @@ import {
 import { Role } from '../models/enums';
 import { DEMO_USER_KEY } from './demo-accounts';
 
-const SESSION_RESTORE_TIMEOUT_MS = 10_000;
-const SESSION_RESTORE_RETRIES = 2;
+const SESSION_RESTORE_TIMEOUT_MS = 3_000;
+const SESSION_RESTORE_RETRIES = 0;
+const BACKGROUND_SESSION_TIMEOUT_MS = 10_000;
+const BACKGROUND_SESSION_RETRIES = 2;
 
 /**
  * True only when the server explicitly rejected the credentials. Everything
@@ -72,6 +74,14 @@ export class AuthService {
     // Remove obsolete browser-only profile/password overrides from the former mock authentication flow.
     localStorage.removeItem('oms.auth.profile.overrides');
     localStorage.removeItem('oms.auth.password.overrides');
+
+    // A successful login stores the user beside the token. Restore that user
+    // synchronously so Angular does not leave the entire application blank
+    // while /auth/me waits on a slow or sleeping API.
+    if (this.token) {
+      const cachedUser = this.readStoredUser();
+      if (cachedUser) this._currentUser.set(cachedUser);
+    }
   }
 
   get token(): string | null {
@@ -110,6 +120,14 @@ export class AuthService {
       this.initialized.set(true);
       return of(void 0);
     }
+
+    // The cached identity is sufficient to render the shell. The backend
+    // remains authoritative and is validated without blocking bootstrap.
+    if (this._currentUser()) {
+      this.initialized.set(true);
+      this.validateStoredSession();
+      return of(void 0);
+    }
     if (!this.init$) {
       this.init$ = this.loadCurrentUser().pipe(
         // App initialisation waits for this request. Never leave the whole UI on
@@ -139,6 +157,44 @@ export class AuthService {
       );
     }
     return this.init$;
+  }
+
+  private readStoredUser(): CurrentUser | null {
+    for (const store of [localStorage, sessionStorage]) {
+      if (!store.getItem(this.tokenKey)) continue;
+      try {
+        const value = JSON.parse(store.getItem(DEMO_USER_KEY) ?? 'null') as Partial<CurrentUser> | null;
+        if (
+          value &&
+          typeof value.userId === 'number' &&
+          typeof value.username === 'string' &&
+          typeof value.email === 'string' &&
+          Object.values(Role).includes(value.role as Role)
+        ) {
+          return value as CurrentUser;
+        }
+      } catch {
+        // An invalid cache is ignored; /auth/me will resolve the session.
+      }
+    }
+    return null;
+  }
+
+  private validateStoredSession(): void {
+    this.loadCurrentUser()
+      .pipe(
+        timeout(BACKGROUND_SESSION_TIMEOUT_MS),
+        retry({
+          count: BACKGROUND_SESSION_RETRIES,
+          delay: (error, attempt) =>
+            isRejectedSession(error) ? throwError(() => error) : timer(attempt * 750),
+        }),
+      )
+      .subscribe({
+        error: (error: unknown) => {
+          if (isRejectedSession(error)) this.logout('session-expired');
+        },
+      });
   }
 
   login(request: LoginRequest, remember = false): Observable<CurrentUser> {

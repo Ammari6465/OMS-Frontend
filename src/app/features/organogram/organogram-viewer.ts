@@ -26,7 +26,8 @@ interface OrgNode {
       <div class="org-toolbar">
         <div class="tb-left">
           <p-select [(ngModel)]="companyId" [options]="companyOptions()" optionLabel="label" optionValue="value"
-            (ngModelChange)="onCompanyChange()" placeholder="Select company" styleClass="company-select" />
+            (ngModelChange)="onCompanyChange()" placeholder="Select company" styleClass="company-select"
+            appendTo="body" panelStyleClass="organogram-company-panel" />
           <span class="org-search">
             <i class="pi pi-search"></i>
             <input type="text" placeholder="Search name, title, department…"
@@ -34,10 +35,6 @@ interface OrgNode {
           </span>
         </div>
         <div class="tb-right">
-          <div class="view-switch" role="group" aria-label="Organogram view">
-            <button [class.active]="viewMode()==='2d'" (click)="setView('2d')" aria-label="Use two-dimensional view">2D</button>
-            <button [class.active]="viewMode()==='3d'" (click)="setView('3d')" aria-label="Use three-dimensional view"><i class="pi pi-box"></i> 3D</button>
-          </div>
           <button class="tb-btn" pTooltip="Expand all" (click)="expandAll()"><i class="pi pi-plus-circle"></i></button>
           <button class="tb-btn" pTooltip="Collapse all" (click)="collapseAll()"><i class="pi pi-minus-circle"></i></button>
           <span class="tb-sep"></span>
@@ -45,18 +42,13 @@ interface OrgNode {
           <span class="zoom-label">{{ (zoom() * 100) | number: '1.0-0' }}%</span>
           <button class="tb-btn" pTooltip="Zoom in" (click)="zoomBy(0.15)"><i class="pi pi-plus"></i></button>
           <button class="tb-btn" pTooltip="Reset view" (click)="resetView()"><i class="pi pi-refresh"></i></button>
-          @if(viewMode()==='3d'){
-            <button class="tb-btn" pTooltip="Rotate left" aria-label="Rotate 3D view left" (click)="rotateBy(-6)"><i class="pi pi-undo"></i></button>
-            <button class="tb-btn" pTooltip="Rotate right" aria-label="Rotate 3D view right" (click)="rotateBy(6)"><i class="pi pi-refresh"></i></button>
-            <button class="tb-btn" pTooltip="Focus selected" aria-label="Focus selected person" [disabled]="!selected()" (click)="focusSelected()"><i class="pi pi-crosshairs"></i></button>
-          }
           <span class="tb-sep"></span>
           <button class="tb-btn text-primary" pTooltip="Export organogram PNG" (click)="exportChart()"><i class="pi pi-download"></i></button>
         </div>
       </div>
 
       <!-- Canvas -->
-      <div class="org-canvas" (mousedown)="startPan($event)" (wheel)="onWheel($event)" [class.panning]="panning()" [class.view-3d]="viewMode()==='3d'">
+      <div class="org-canvas" (mousedown)="startPan($event)" (wheel)="onWheel($event)" [class.panning]="panning()">
         @if (roots().length) {
           <div class="org-stage" [style.transform]="stageTransform()">
             <div class="chart">
@@ -193,14 +185,15 @@ interface OrgNode {
         padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--oms-glass-border);
         background: var(--oms-glass-strong);
         -webkit-backdrop-filter: var(--oms-glass-filter); backdrop-filter: var(--oms-glass-filter);
+        position: relative; z-index: 20; overflow: visible;
       }
-      .tb-left, .tb-right { display: flex; align-items: center; gap: 0.5rem; }
-      :host ::ng-deep .company-select { min-width: 15rem; }
-      .view-switch{display:inline-flex;padding:3px;border:1px solid var(--p-content-border-color);border-radius:10px;background:var(--oms-subtle-bg)}.view-switch button{border:0;border-radius:7px;background:transparent;color:var(--p-text-muted-color);padding:.35rem .58rem;font-size:.75rem;font-weight:700;cursor:pointer}.view-switch button.active{background:var(--p-content-background);color:var(--p-primary-color);box-shadow:0 3px 10px rgba(0,0,0,.14)}
-      .org-search { position: relative; }
+      .tb-left, .tb-right { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+      .tb-left { flex: 1 1 34rem; }
+      :host ::ng-deep .company-select { width: clamp(15rem, 24vw, 20rem); }
+      .org-search { position: relative; flex: 1 1 18rem; min-width: 12rem; }
       .org-search i { position: absolute; left: 0.7rem; top: 50%; transform: translateY(-50%); color: var(--p-text-muted-color); }
       .org-search input {
-        padding: 0.55rem 0.8rem 0.55rem 2rem; border-radius: 8px; min-width: 18rem;
+        padding: 0.55rem 0.8rem 0.55rem 2rem; border-radius: 8px; width: 100%; min-width: 0;
         background: var(--p-content-background); color: var(--p-text-color);
         border: 1px solid var(--p-content-border-color); outline: none;
       }
@@ -212,13 +205,13 @@ interface OrgNode {
       .tb-sep { width: 1px; height: 22px; background: var(--p-content-border-color); margin: 0 0.25rem; }
       .zoom-label { font-size: 0.82rem; color: var(--p-text-muted-color); min-width: 3rem; text-align: center; }
 
-      .org-canvas { flex: 1; overflow: hidden; position: relative; cursor: grab;
+      .org-canvas { flex: 1; overflow: hidden; position: relative; z-index: 0; cursor: grab;
         background:
           radial-gradient(circle at 1px 1px, var(--p-content-border-color) 1px, transparent 0);
         background-size: 26px 26px; }
       .org-canvas.panning { cursor: grabbing; }
       .org-stage { transform-origin: 0 0; padding: 3rem; width: max-content; }
-      .org-canvas.view-3d{perspective:1500px;background:radial-gradient(circle at 50% 25%,color-mix(in srgb,var(--p-primary-color) 10%,transparent),transparent 38%),radial-gradient(circle at 1px 1px,var(--p-content-border-color) 1px,transparent 0);background-size:auto,26px 26px}.view-3d .org-stage{transform-style:preserve-3d;transform-origin:30% 20%}.view-3d .chart,.view-3d .chart ul,.view-3d .chart li{transform-style:preserve-3d}.view-3d .chart ul ul{transform:translateZ(10px)}.view-3d .node{background:color-mix(in srgb,var(--p-content-background) 91%,transparent);backdrop-filter:blur(12px);box-shadow:0 18px 36px -24px rgba(0,0,0,.72),inset 0 1px rgba(255,255,255,.16);transform:translateZ(18px)}.view-3d .node:hover,.view-3d .node.related{transform:translateY(-5px) translateZ(34px);box-shadow:0 25px 42px -22px color-mix(in srgb,var(--p-primary-color) 35%,rgba(0,0,0,.6))}.node.branch-dim{opacity:.3;filter:saturate(.45)}.node.related{border-color:color-mix(in srgb,var(--p-primary-color) 58%,var(--p-content-border-color))}.node:focus-visible{outline:2px solid var(--p-primary-color);outline-offset:3px}
+      .node.branch-dim{opacity:.3;filter:saturate(.45)}.node.related{border-color:color-mix(in srgb,var(--p-primary-color) 58%,var(--p-content-border-color))}.node:focus-visible{outline:2px solid var(--p-primary-color);outline-offset:3px}
 
       /* org chart connectors */
       .chart ul { display: flex; justify-content: center; padding-top: 22px; position: relative; margin: 0; }
@@ -327,10 +320,10 @@ interface OrgNode {
       .chain-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 0; font-size: 0.85rem; }
       .chain-item em { color: var(--p-text-muted-color); font-style: normal; }
       .chain-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-      @media(max-width:760px){.org-shell{height:calc(100vh - var(--oms-topbar-height))}.tb-left,.tb-right{width:100%;overflow-x:auto}.org-search{flex:1}.org-search input{min-width:12rem;width:100%}.view-3d .org-stage{transform-style:flat}.view-3d .node{transform:none}.tb-sep{display:none}
+      @media(max-width:760px){.org-shell{height:calc(100vh - var(--oms-topbar-height))}.tb-left,.tb-right{width:100%}.tb-left{overflow:visible;flex-wrap:wrap}.tb-right{overflow-x:auto}.org-search{flex:1 1 100%}:host ::ng-deep .company-select{width:100%}.tb-sep{display:none}
         /* Mobile GPUs: drop per-node blur, keep the surface opaque for legibility */
-        .node,.view-3d .node{-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--p-content-background)}}
-      @media(prefers-reduced-motion:reduce){.node,.org-stage,.drawer{transition:none;animation:none}.view-3d .node:hover,.view-3d .node.related{transform:translateZ(18px)}}
+        .node{-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--p-content-background)}}
+      @media(prefers-reduced-motion:reduce){.node,.org-stage,.drawer{transition:none;animation:none}}
     `,
   ],
 })
@@ -354,8 +347,6 @@ export class OrganogramViewer implements OnInit {
   readonly companyId = signal<number | null>(null);
   readonly term = signal('');
   readonly zoom = signal(1);
-  readonly viewMode = signal<'2d'|'3d'>('2d');
-  readonly rotation = signal(-5);
   readonly hoveredId = signal<number|null>(null);
   readonly selected = signal<Staff | null>(null);
   readonly draggedNode = signal<OrgNode | null>(null);
@@ -433,10 +424,6 @@ export class OrganogramViewer implements OnInit {
       document.querySelector('.node.match')?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
     });
   }
-
-  setView(mode:'2d'|'3d'):void{this.viewMode.set(mode);this.resetView()}
-  rotateBy(delta:number):void{this.rotation.update(value=>Math.max(-24,Math.min(24,value+delta)))}
-  focusSelected():void{const person=this.selected();if(!person)return;this.term.set(person.name);this.zoom.set(1.15);this.pan.set({x:0,y:0})}
 
   onCompanyChange(): void {
     this.collapsed.set(new Set());
@@ -518,8 +505,7 @@ export class OrganogramViewer implements OnInit {
   // ---- zoom & pan ----
   stageTransform(): string {
     const p = this.pan();
-    const depth=this.viewMode()==='3d'?` rotateX(5deg) rotateY(${this.rotation()}deg)`:'';
-    return `translate(${p.x}px, ${p.y}px) scale(${this.zoom()})${depth}`;
+    return `translate(${p.x}px, ${p.y}px) scale(${this.zoom()})`;
   }
 
   zoomBy(delta: number): void {
@@ -529,7 +515,6 @@ export class OrganogramViewer implements OnInit {
   resetView(): void {
     this.zoom.set(1);
     this.pan.set({ x: 0, y: 0 });
-    this.rotation.set(-5);
   }
 
   onWheel(ev: WheelEvent): void {

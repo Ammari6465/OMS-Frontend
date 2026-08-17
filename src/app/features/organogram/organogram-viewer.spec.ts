@@ -99,15 +99,10 @@ describe('OrganogramViewer Component UI & Interactions', () => {
     expect(component.zoom()).toBe(1.0);
   });
 
-  it('[POSITIVE] keeps 2D as the safe default and enables controlled 3D perspective', () => {
-    expect(component.viewMode()).toBe('2d');
-    component.setView('3d');
-    component.rotateBy(6);
-    expect(component.viewMode()).toBe('3d');
-    expect(component.rotation()).toBe(1);
-    expect(component.stageTransform()).toContain('rotateY(1deg)');
-    component.resetView();
-    expect(component.rotation()).toBe(-5);
+  it('[POSITIVE] keeps the organogram transform two-dimensional', () => {
+    component.zoom.set(1.25);
+    expect(component.stageTransform()).toBe('translate(0px, 0px) scale(1.25)');
+    expect(component.stageTransform()).not.toContain('rotate');
   });
 
   it('[POSITIVE] highlights the hovered person, manager and direct reports', () => {

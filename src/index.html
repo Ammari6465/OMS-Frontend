@@ -2,93 +2,121 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Sunrich Companies — Organogram Platform</title>
+  <title>Sunrich Companies - Organogram Platform</title>
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Sunrich Companies Organogram Management System — manage multi-company structures, departments, and headcount in real-time.">
+  <meta name="description" content="Sunrich Companies Organogram Management System - manage multi-company structures, departments, and headcount in real-time.">
   <link rel="icon" type="image/png" href="logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Orbitron:wght@600;800;900&family=Outfit:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@700;800&family=Space+Grotesk:wght@600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-  <!--
-    Rendering is blocked until the app initializer resolves the session against
-    the remote API. Angular clears app-root's children when it creates the
-    component, so this placeholder covers exactly that window instead of
-    leaving a blank page with no feedback (and no clue) when the API is slow.
-  -->
-  <app-root>
-    <div class="oms-boot" role="status" aria-live="polite">
-      <div class="oms-boot__spinner"></div>
-      <p class="oms-boot__label">Loading Sunrich OMS…</p>
-      <div class="oms-boot__stuck">
-        <p class="oms-boot__hint">This is taking longer than expected — the server may be slow to wake.</p>
-        <a class="oms-boot__action" href="/dashboard">Reload</a>
-        <a class="oms-boot__action oms-boot__action--muted" href="/auth/login">Sign in again</a>
-      </div>
+  <app-root></app-root>
+
+  <!-- Kept outside app-root so Angular cannot clear it during bootstrap. -->
+  <div id="oms-bootstrap-loader" class="oms-boot" role="status" aria-live="polite">
+    <div class="oms-boot__glow"></div>
+    <div class="oms-boot__brand">
+      <img src="logo.png" alt="" class="oms-boot__logo">
+      <span>OMS</span>
     </div>
-  </app-root>
+    <div class="oms-boot__track"><span></span></div>
+    <p class="oms-boot__label">Preparing your workspace&hellip;</p>
+    <div class="oms-boot__stuck">
+      <p class="oms-boot__hint">This is taking longer than expected. The server may be waking up.</p>
+      <a class="oms-boot__action" href="/dashboard">Reload</a>
+      <a class="oms-boot__action oms-boot__action--muted" href="/auth/login">Sign in again</a>
+    </div>
+  </div>
   <style>
     .oms-boot {
       position: fixed;
       inset: 0;
+      z-index: 2147483647;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 1rem;
+      gap: 1.1rem;
+      padding: 1.5rem;
+      overflow: hidden;
       background: #0b1120;
-      color: #94a3b8;
+      color: #cbd5e1;
       font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
       text-align: center;
-      padding: 1.5rem;
+      opacity: 1;
+      visibility: visible;
+      transition: opacity 420ms cubic-bezier(.16,1,.3,1), visibility 420ms;
     }
-    .oms-boot__spinner {
-      width: 34px;
-      height: 34px;
-      border: 3px solid rgba(148, 163, 184, 0.25);
-      border-top-color: #0f8bfd;
+    .oms-boot.is-leaving { opacity: 0; visibility: hidden; pointer-events: none; }
+    .oms-boot__glow {
+      position: absolute;
+      width: min(72vw, 680px);
+      aspect-ratio: 1;
       border-radius: 50%;
-      animation: oms-boot-spin 0.8s linear infinite;
+      background: radial-gradient(circle, rgba(15,139,253,.14), transparent 66%);
+      animation: oms-boot-breathe 2.4s ease-in-out infinite;
     }
-    .oms-boot__label { margin: 0; font-size: 0.9rem; font-weight: 600; }
-    /*
-      Only appears once the wait is clearly abnormal. A stuck session restore
-      used to leave the user on a dead page with no way forward; these give
-      them one without needing devtools.
-    */
+    .oms-boot__brand {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: .8rem;
+      color: #fff;
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: .12em;
+      animation: oms-boot-rise 500ms cubic-bezier(.16,1,.3,1) both;
+    }
+    .oms-boot__logo { width: 48px; height: 48px; object-fit: contain; filter: drop-shadow(0 0 14px rgba(15,139,253,.3)); }
+    .oms-boot__track {
+      position: relative;
+      width: min(240px, 68vw);
+      height: 3px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(148,163,184,.15);
+    }
+    .oms-boot__track span {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 42%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, transparent, #0f8bfd, #38bdf8, transparent);
+      animation: oms-boot-progress 1.25s cubic-bezier(.65,0,.35,1) infinite;
+    }
+    .oms-boot__label { position: relative; margin: 0; color: #94a3b8; font-size: .84rem; font-weight: 600; }
     .oms-boot__stuck {
+      position: relative;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 0.75rem;
+      gap: .75rem;
       opacity: 0;
       visibility: hidden;
       animation: oms-boot-stuck 0s linear 12s forwards;
     }
-    .oms-boot__hint { margin: 0; font-size: 0.78rem; max-width: 34ch; line-height: 1.5; }
+    .oms-boot__hint { margin: 0; max-width: 34ch; font-size: .78rem; line-height: 1.5; }
     .oms-boot__action {
       display: inline-block;
-      padding: 0.5rem 1.4rem;
+      padding: .5rem 1.4rem;
       border-radius: 7px;
       background: #0f8bfd;
       color: #fff;
-      font-size: 0.82rem;
+      font-size: .82rem;
       font-weight: 600;
       text-decoration: none;
     }
-    .oms-boot__action--muted {
-      background: transparent;
-      color: #94a3b8;
-      text-decoration: underline;
-      padding: 0;
-      font-weight: 500;
-    }
-    @keyframes oms-boot-spin { to { transform: rotate(360deg); } }
+    .oms-boot__action--muted { padding: 0; background: transparent; color: #94a3b8; font-weight: 500; text-decoration: underline; }
+    @keyframes oms-boot-progress { from { transform: translateX(-115%); } to { transform: translateX(350%); } }
+    @keyframes oms-boot-rise { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+    @keyframes oms-boot-breathe { 50% { transform: scale(1.08); opacity: .72; } }
     @keyframes oms-boot-stuck { to { opacity: 1; visibility: visible; } }
     @media (prefers-reduced-motion: reduce) {
-      .oms-boot__spinner { animation-duration: 2.4s; }
+      .oms-boot, .oms-boot__brand { transition-duration: .01ms; animation-duration: .01ms; }
+      .oms-boot__track span { animation-duration: 2.4s; }
+      .oms-boot__glow { animation: none; }
     }
   </style>
 </body>

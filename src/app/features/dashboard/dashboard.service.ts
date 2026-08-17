@@ -221,19 +221,29 @@ export class DashboardService {
     ].filter((a) => a.visible);
   });
 
-  /** (Re)loads the dashboard. Simulated latency drives the skeleton states. */
+  /**
+   * (Re)loads the dashboard from the organisation API.
+   *
+   * Do not finish loading on a timer: on a cold start the organisation stores
+   * may still be empty while their HTTP requests are in flight.  The previous
+   * timer made the view settle on the empty state and, because LocalStore
+   * snapshots are not signals, it never recomputed when the requests finished.
+   */
   refresh(): void {
     this.loading.set(true);
     this.error.set(false);
-    setTimeout(() => {
-      try {
+
+    this.org.init().subscribe({
+      next: () => {
         this.tick.update((v) => v + 1);
         this.loading.set(false);
-      } catch {
+      },
+      error: () => {
         this.error.set(true);
         this.loading.set(false);
-      }
-    }, 350);
+      },
+    });
+
     if (this.auth.isAdmin()) {
       this.audit.list({ page: 0, size: 6, sort: 'timestamp', direction: 'desc', companyId: this.effectiveCompanyId() })
         .subscribe({ next: (page) => this.recentEvents.set(page.content), error: () => this.recentEvents.set([]) });

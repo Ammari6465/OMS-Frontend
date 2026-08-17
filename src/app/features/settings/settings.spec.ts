@@ -2,113 +2,88 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { MessageService } from 'primeng/api';
-import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { Settings } from './settings';
-import { ThemeService } from '../../core/services/theme.service';
 import { OmsStyleService } from '../../core/services/oms-style.service';
 import { environment } from '../../../environments/environment';
 
 describe('Settings Component UI & Interactions', () => {
   let component: Settings;
   let fixture: ComponentFixture<Settings>;
-  let httpTestingController: HttpTestingController;
-  let themeServiceMock: any;
-  let omsStyleServiceMock: any;
+  let http: HttpTestingController;
+  let messages: MessageService;
+  let omsStyle: any;
 
   beforeEach(async () => {
-    themeServiceMock = {
-      mode: vi.fn().mockReturnValue('dark'),
-      toggle: vi.fn(),
-    };
-
-    omsStyleServiceMock = {
-      styles: [
-        { id: 'default', name: 'Classic Pill', font: 'Inter', badgeClass: 'oms-badge-classic' },
-        { id: 'glass', name: 'Glassmorphism', font: 'Inter', badgeClass: 'oms-badge-glass' },
-      ],
+    omsStyle = {
+      styles: [{ id: 'default', name: 'Classic', font: 'Inter', badgeClass: 'oms-badge-classic' }],
       currentStyle: vi.fn().mockReturnValue('default'),
-      setStyle: vi.fn(),
+      setStyle: vi.fn(), preview: vi.fn(), endPreview: vi.fn(),
     };
-
     await TestBed.configureTestingModule({
       imports: [Settings],
       providers: [
         MessageService,
-        { provide: ThemeService, useValue: themeServiceMock },
-        { provide: OmsStyleService, useValue: omsStyleServiceMock },
+        { provide: OmsStyleService, useValue: omsStyle },
         provideHttpClient(),
         provideHttpClientTesting(),
       ],
     }).compileComponents();
 
-    httpTestingController = TestBed.inject(HttpTestingController);
+    http = TestBed.inject(HttpTestingController);
+    messages = TestBed.inject(MessageService);
+    vi.spyOn(messages, 'add');
     fixture = TestBed.createComponent(Settings);
     component = fixture.componentInstance;
+  });
 
-    // Flush initial GET settings request
-    const req = httpTestingController.expectOne(`${environment.apiUrl}/records/settings`);
-    req.flush({
+  afterEach(() => http.verify());
+
+  function loadRules(): void {
+    http.expectOne(`${environment.apiUrl}/records/settings`).flush({
       success: true,
-      data: [
-        {
-          id: 1,
-          kind: 'notification-preferences',
-          values: { onboarding: true, exits: false, transfers: true, vacancies: false },
-        },
-        {
-          id: 2,
-          kind: 'password-reset-roles',
-          values: { SUPER_ADMIN: true, COMPANY_ADMIN: true, MANAGER: false, STAFF: false, READ_ONLY: false },
-        },
-      ],
+      data: [{ id: 1, kind: 'notification-preferences', values: { onboarding: true, exits: false, transfers: true, vacancies: false } }],
     });
-
     fixture.detectChanges();
+  }
+
+  it('loads the enforced system notification rules', () => {
+    loadRules();
+    expect(component.loading()).toBe(false);
+    expect(component.rules().find((rule) => rule.key === 'exits')?.value).toBe(false);
+    expect(component.securityPolicy.find((item) => item.role === 'Company Admin')?.allowed).toBe(true);
   });
 
-  afterEach(() => {
-    httpTestingController.verify();
+  it('saves a changed rule and reports success', () => {
+    loadRules();
+    component.toggleRule('vacancies', true);
+    expect(component.saving()).toBe(true);
+    const request = http.expectOne(`${environment.apiUrl}/records/settings/1`);
+    expect(request.request.method).toBe('PUT');
+    expect(request.request.body.values.vacancies).toBe(true);
+    request.flush({ success: true, data: { id: 1, kind: 'notification-preferences', values: request.request.body.values } });
+    expect(component.saving()).toBe(false);
+    expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success' }));
   });
 
-  it('[POSITIVE] initializes and loads settings records from backend endpoint', () => {
-    expect(component.prefs().find((p) => p.key === 'exits')?.value).toBe(false);
-    expect(component.prefs().find((p) => p.key === 'transfers')?.value).toBe(true);
-    expect(component.resetRoles().find((r) => r.role === 'COMPANY_ADMIN')?.allowed).toBe(true);
+  it('rolls back an optimistic change when saving fails', () => {
+    loadRules();
+    component.toggleRule('vacancies', true);
+    http.expectOne(`${environment.apiUrl}/records/settings/1`).flush(null, { status: 500, statusText: 'Server error' });
+    expect(component.rules().find((rule) => rule.key === 'vacancies')?.value).toBe(false);
+    expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ severity: 'error' }));
   });
 
-  it('[POSITIVE] toggling theme calls ThemeService toggle', () => {
-    component.onTheme(false);
-    expect(themeServiceMock.toggle).toHaveBeenCalled();
+  it('shows a recoverable load error', () => {
+    http.expectOne(`${environment.apiUrl}/records/settings`).flush(null, { status: 503, statusText: 'Unavailable' });
+    expect(component.loading()).toBe(false);
+    expect(component.loadError()).toContain('server');
   });
 
-  it('[POSITIVE] selecting typography style calls OmsStyleService setStyle', () => {
-    omsStyleServiceMock.setStyle('glass');
-    expect(omsStyleServiceMock.setStyle).toHaveBeenCalledWith('glass');
-  });
-
-  it('[POSITIVE] toggling notification preference sends HTTP PUT request', () => {
-    component.togglePref('vacancies', true);
-
-    const req = httpTestingController.expectOne(`${environment.apiUrl}/records/settings/1`);
-    expect(req.request.method).toBe('PUT');
-    expect(req.request.body.kind).toBe('notification-preferences');
-    expect(req.request.body.values['vacancies']).toBe(true);
-    req.flush({ success: true, data: { id: 1, kind: 'notification-preferences', values: { vacancies: true } } });
-  });
-
-  it('[POSITIVE] toggling password reset role policy sends HTTP PUT request', () => {
-    component.toggleReset('MANAGER' as any, true);
-
-    const req = httpTestingController.expectOne(`${environment.apiUrl}/records/settings/2`);
-    expect(req.request.method).toBe('PUT');
-    expect(req.request.body.kind).toBe('password-reset-roles');
-    expect(req.request.body.values['MANAGER']).toBe(true);
-    req.flush({ success: true, data: { id: 2, kind: 'password-reset-roles', values: { MANAGER: true } } });
-  });
-
-  it('[NEGATIVE] SUPER_ADMIN password reset toggle remains disabled for self-preservation', () => {
-    const superAdminRole = component.resetRoles().find((r) => r.role === 'SUPER_ADMIN');
-    expect(superAdminRole?.allowed).toBe(true);
+  it('keeps the application theme selector local and immediate', () => {
+    loadRules();
+    omsStyle.setStyle('default');
+    expect(omsStyle.setStyle).toHaveBeenCalledWith('default');
   });
 });

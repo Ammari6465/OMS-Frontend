@@ -56,21 +56,61 @@ describe('AuthService API workflows', () => {
     expect(localStorage.getItem(environment.tokenStorageKey)).toBe('jwt-token');
   });
 
-  it('abandons a stalled session restore instead of blocking app startup', async () => {
+  it('restores a cached user without blocking startup and validates it in the background', async () => {
+    localStorage.setItem(environment.tokenStorageKey, 'good-token');
+    localStorage.setItem('oms.auth.demo.user', JSON.stringify(user));
+
+    // Recreate the service after storage is populated so its constructor can
+    // restore the cached identity.
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        AuthService,
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        { provide: Router, useValue: { navigate: vi.fn() } },
+      ],
+    });
+    service = TestBed.inject(AuthService);
+    http = TestBed.inject(HttpTestingController);
+
+    await expect(firstValueFrom(service.init())).resolves.toBeUndefined();
+    expect(service.initialized()).toBe(true);
+    expect(service.currentUser()).toEqual(user);
+
+    http.expectOne(`${environment.apiUrl}/auth/me`).flush(envelope(user));
+  });
+
+  it('abandons an uncached stalled session restore quickly while keeping the token', async () => {
     vi.useFakeTimers();
-    localStorage.setItem(environment.tokenStorageKey, 'stale-token');
+    localStorage.setItem(environment.tokenStorageKey, 'good-token');
 
     const result = firstValueFrom(service.init());
     const request = http.expectOne(`${environment.apiUrl}/auth/me`);
-
-    await vi.advanceTimersByTimeAsync(10_001);
+    await vi.advanceTimersByTimeAsync(3_001);
 
     await expect(result).resolves.toBeUndefined();
     expect(request.cancelled).toBe(true);
     expect(service.initialized()).toBe(true);
     expect(service.isAuthenticated()).toBe(false);
-    expect(localStorage.getItem(environment.tokenStorageKey)).toBeNull();
+    // A timeout says nothing about whether the token is still good. Wiping it
+    // here logged the user out for good whenever the API was merely slow.
+    expect(localStorage.getItem(environment.tokenStorageKey)).toBe('good-token');
     vi.useRealTimers();
+  });
+
+  it('clears the session only when the server actually rejects the token', async () => {
+    localStorage.setItem(environment.tokenStorageKey, 'stale-token');
+
+    const result = firstValueFrom(service.init());
+    http
+      .expectOne(`${environment.apiUrl}/auth/me`)
+      .flush(null, { status: 401, statusText: 'Unauthorized' });
+
+    await expect(result).resolves.toBeUndefined();
+    expect(service.initialized()).toBe(true);
+    expect(service.isAuthenticated()).toBe(false);
+    expect(localStorage.getItem(environment.tokenStorageKey)).toBeNull();
   });
 
   it('updates profile and changes password through the backend', async () => {
