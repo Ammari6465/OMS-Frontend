@@ -9,6 +9,7 @@ import {
   AmbiguityCandidate,
   AskOmsBlock,
   AskOmsContext,
+  CapabilityBlock,
   ComparisonBlock,
   DataQualityBlock,
   DataQualityIssue,
@@ -17,7 +18,22 @@ import {
   PositionBlock,
   ReportingChainBlock,
   ReportingChainNode,
+  VacancySummaryBlock,
 } from './ai-models';
+import { CONFIDENCE, bestIntent, detectSmallTalk, isCapabilityQuery } from './intent-classifier';
+import { NormalizedQuery, normalizeQuery } from './query-normalizer';
+import {
+  CHAIN_TERMS,
+  CONTACT_TERMS,
+  EMPLOYEE_TERMS,
+  FULL_TEAM_TERMS,
+  HEADCOUNT_TERMS,
+  HEAD_TERMS,
+  JOIN_TERMS,
+  MANAGER_TERMS,
+  VACANCY_TERMS,
+  hasTerm,
+} from './intent-vocabulary';
 
 /** Read-only view of OMS data the engine is allowed to reason over. */
 export interface AiDataContext {
@@ -32,7 +48,8 @@ export interface AiDataContext {
   currentContext?: AskOmsContext;
 }
 
-const RESTRICTED = /\bsalar|\bcompensat|\bremunerat|\bpayroll|\bwage|\bbonus|\bctc\b|\bincome|\bpay[\s-]?(grade|scale|slip|rate|band)/i;
+const RESTRICTED =
+  /\bsalar|\bcompensat|\bremunerat|\bpayroll|\bwage|\bbonus|\bctc\b|\bincome|\bearn(s|ed|ing)?\b|\bpaid\b|\btake[\s-]?home\b|\bpay[\s-]?(grade|scale|slip|rate|band|check|cheque)/i;
 const plural = (n: number, one: string, many = one + 's') => `${n} ${n === 1 ? one : many}`;
 
 export function cleanTitle(name: string): string {
@@ -129,6 +146,38 @@ export function buildPositionBlock(p: Position, ctx: AiDataContext): PositionBlo
   };
 }
 
+/** Open positions, excluding closed requisitions — the single definition used everywhere. */
+export function openVacancies(ctx: AiDataContext, deptId?: number | null): Position[] {
+  return ctx.positions.filter(
+    (p) => p.isVacant && p.status !== 'CLOSED' && (deptId == null || p.deptId === deptId),
+  );
+}
+
+/** Roll-up of open roles, grouped by department and ordered largest first. */
+export function buildVacancySummaryBlock(
+  vacancies: Position[],
+  ctx: AiDataContext,
+  scope?: Department | null,
+): VacancySummaryBlock {
+  const byDept = new Map<number | null | undefined, { name: string; deptId?: number | null; count: number }>();
+  for (const v of vacancies) {
+    const key = v.deptId ?? null;
+    const entry = byDept.get(key) ?? { name: ctx.deptName(v.deptId), deptId: v.deptId, count: 0 };
+    entry.count += 1;
+    byDept.set(key, entry);
+  }
+
+  return {
+    kind: 'vacancy-summary',
+    scopeName: scope?.name ?? null,
+    scopeDeptId: scope?.id ?? null,
+    totalOpen: vacancies.length,
+    departmentCount: byDept.size,
+    byDepartment: [...byDept.values()].sort((a, b) => b.count - a.count),
+    titles: vacancies.map((v) => v.title),
+  };
+}
+
 // ---- Context & Entity Resolvers ---------------------------------------------
 
 function hasStaffPronoun(q: string): boolean {
@@ -216,6 +265,29 @@ export function matchStaffWithContext(query: string, ctx: AiDataContext): Staff[
   return scored.filter((x) => x.score === best).map((x) => x.s);
 }
 
+/**
+ * True when the query literally names a department or a person.
+ *
+ * Deliberately narrower than {@link matchStaffWithContext}, which also resolves
+ * "my"/"her" to the signed-in user — that shortcut would make "what can I ask"
+ * look like it named someone and hide the capability screen behind a lookup.
+ */
+function namesConcreteEntity(query: string, ctx: AiDataContext): boolean {
+  const q = query.toLowerCase();
+
+  const deptHit = ctx.departments.some(
+    (d) => d.name && new RegExp(`\\b${d.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(q),
+  );
+  if (deptHit) return true;
+
+  const tokens = q.split(/[^a-z0-9]+/).filter((t) => t.length > 2 && !STOP_WORDS.has(t));
+  if (!tokens.length) return false;
+  return ctx.staff.some((s) => {
+    const words = nameWords(s.name);
+    return tokens.some((t) => words.includes(t));
+  });
+}
+
 export function matchDepartmentWithContext(query: string, ctx: AiDataContext): Department | undefined {
   const q = query.toLowerCase();
 
@@ -264,62 +336,90 @@ export function matchCompanyWithContext(query: string, ctx: AiDataContext): Comp
 
 // ---- Dynamic Follow-Up Suggestions ------------------------------------------
 
+/**
+ * Follow-ups for the answer the user just received.
+ *
+ * Keyed on intent first, then on the entity in play — a vacancy answer scoped
+ * to a department should offer vacancy follow-ups, not department ones. Capped
+ * at three so the thread stays readable; the panel repeats no global list.
+ */
 export function generateFollowUpSuggestions(
   intent: AiIntentKind,
   context: Partial<AskOmsContext>,
   ctx: AiDataContext,
 ): AiSuggestion[] {
   const list: AiSuggestion[] = [];
+  const dept = context.departmentName;
+  const name = context.staffName;
+  const first = name ? firstName(name) : null;
 
-  if (context.staffName) {
-    const name = context.staffName;
-    const first = firstName(name);
-    list.push(
-      { label: `Who is ${first}'s manager?`, query: `Who is the manager of ${name}?`, icon: 'pi pi-user' },
-      { label: `Who reports to ${first}?`, query: `Who reports to ${name}?`, icon: 'pi pi-sitemap' },
-      { label: `Show ${first}'s team`, query: `Show ${name}'s team`, icon: 'pi pi-users' },
-      { label: `Show ${first}'s reporting chain`, query: `Show ${name}'s reporting chain`, icon: 'pi pi-arrows-v' },
-      { label: `Show ${first}'s department`, query: `Show ${first}'s department`, icon: 'pi pi-building' },
-      { label: `Vacancies in ${first}'s department`, query: `Any vacancies in ${first}'s department?`, icon: 'pi pi-inbox' },
-    );
-  } else if (context.departmentName) {
-    const dept = context.departmentName;
-    list.push(
-      { label: `Employees in ${dept}`, query: `Show employees in ${dept}`, icon: 'pi pi-users' },
-      { label: `Who heads ${dept}?`, query: `Who heads ${dept}?`, icon: 'pi pi-user' },
-      { label: `Vacancies in ${dept}`, query: `Show vacancies in ${dept}`, icon: 'pi pi-inbox' },
-      { label: `Compare ${dept} with Operations`, query: `Compare ${dept} and Operations`, icon: 'pi pi-chart-bar' },
-      { label: `${dept} headcount`, query: `How many employees are in ${dept}?`, icon: 'pi pi-hashtag' },
-    );
-  } else if (intent === 'vacancies') {
-    const topDept = ctx.departments[0]?.name ?? 'Operations';
-    list.push(
-      { label: `Vacancies in ${topDept}`, query: `Vacancies in ${topDept}`, icon: 'pi pi-inbox' },
-      { label: 'Department with most vacancies', query: 'Which department has the most vacancies?', icon: 'pi pi-chart-bar' },
-      { label: 'Show all open positions', query: 'Show open vacancies', icon: 'pi pi-briefcase' },
-    );
+  // Conversational and meta replies carry their own suggestions.
+  if (intent === 'greeting' || intent === 'courtesy' || intent === 'capabilities' || intent === 'did-you-mean') {
+    return [];
+  }
+
+  if (intent === 'vacancies') {
+    const busiest = [...ctx.departments]
+      .map((d) => ({ d, n: openVacancies(ctx, d.id).length }))
+      .sort((a, b) => b.n - a.n)
+      .filter((x) => x.n > 0)[0]?.d;
+    if (dept) list.push(suggest(`Employees in ${dept}`, `Show employees in ${dept}`, 'pi pi-users'));
+    if (busiest && busiest.name !== dept) {
+      list.push(suggest(`Vacancies in ${busiest.name}`, `Vacancies in ${busiest.name}`, 'pi pi-inbox'));
+    }
+    list.push(suggest('Which department has most vacancies?', 'Which department has the most vacancies?', 'pi pi-chart-bar'));
   } else if (intent === 'data-quality') {
     list.push(
-      { label: 'Staff with no manager', query: 'Which employees have no manager?', icon: 'pi pi-exclamation-circle' },
-      { label: 'Departments with no head', query: 'Which departments have no head?', icon: 'pi pi-exclamation-triangle' },
-      { label: 'Incomplete employee records', query: 'Show incomplete employee records', icon: 'pi pi-id-card' },
+      suggest('Staff with no manager', 'Which employees have no manager?', 'pi pi-exclamation-circle'),
+      suggest('Departments with no head', 'Which departments have no head?', 'pi pi-exclamation-triangle'),
+      suggest('Incomplete employee records', 'Show incomplete employee records', 'pi pi-id-card'),
     );
+  } else if (name && first) {
+    // Skip the follow-up that just repeats the question that was answered.
+    if (intent !== 'manager-of') list.push(suggest(`Who is ${first}'s manager?`, `Who is the manager of ${name}?`, 'pi pi-arrow-up'));
+    if (intent !== 'reporting-hierarchy' && intent !== 'team-hierarchy') {
+      list.push(suggest(`Show ${first}'s team`, `Show ${name}'s whole team`, 'pi pi-users'));
+    }
+    if (intent !== 'reporting-chain') list.push(suggest(`${first}'s reporting chain`, `Show ${name}'s reporting chain`, 'pi pi-arrows-v'));
+    if (dept) list.push(suggest(`Vacancies in ${dept}`, `Any vacancies in ${dept}?`, 'pi pi-inbox'));
+  } else if (dept) {
+    // `intent` is already known not to be 'vacancies' or 'data-quality' here.
+    if (intent !== 'department-scoped') list.push(suggest('Show employees', `Show employees in ${dept}`, 'pi pi-users'));
+    list.push(suggest('Show vacancies', `Vacancies in ${dept}`, 'pi pi-inbox'));
+    if (intent !== 'department-head') list.push(suggest(`Who heads ${dept}?`, `Who heads ${dept}?`, 'pi pi-user'));
+    const other = ctx.departments.find((d) => d.name !== dept)?.name;
+    if (other) list.push(suggest('Compare department size', `Compare ${dept} and ${other}`, 'pi pi-chart-bar'));
   }
 
-  if (list.length < 3) {
+  if (!list.length) {
     list.push(
-      { label: 'Show open vacancies', query: 'Show open vacancies', icon: 'pi pi-inbox' },
-      { label: 'Who joined recently?', query: 'Who joined recently?', icon: 'pi pi-calendar' },
-      { label: 'Compare department sizes', query: 'Compare department sizes', icon: 'pi pi-chart-bar' },
+      suggest('Show open vacancies', 'Show open vacancies', 'pi pi-inbox'),
+      suggest('Who joined recently?', 'Who joined recently?', 'pi pi-calendar'),
+      suggest('Compare department sizes', 'Which department has the most employees?', 'pi pi-chart-bar'),
     );
   }
 
-  return list.slice(0, 5);
+  return list.slice(0, 3);
 }
 
 // ---- Ambiguity Handler ------------------------------------------------------
 
-function handleAmbiguousStaff(matches: Staff[], ctx: AiDataContext): AiResult {
+/**
+ * The part of the query that actually matched the candidates, so the
+ * disambiguation prompt can quote it ("3 employees matching \"John\"").
+ */
+function searchTermFor(query: string, matches: Staff[]): string | null {
+  const tokens = query
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length > 1 && !STOP_WORDS.has(t));
+  const hits = tokens.filter((t) => matches.some((m) => nameWords(m.name).some((w) => w === t || w.startsWith(t))));
+  if (!hits.length) return null;
+  return hits.map((t) => t.charAt(0).toUpperCase() + t.slice(1)).join(' ');
+}
+
+function handleAmbiguousStaff(matches: Staff[], ctx: AiDataContext, term?: string | null): AiResult {
+  const quoted = term ? ` matching "${term}"` : '';
   const candidates: AmbiguityCandidate[] = matches.map((s) => ({
     id: s.id,
     name: s.name,
@@ -340,18 +440,51 @@ function handleAmbiguousStaff(matches: Staff[], ctx: AiDataContext): AiResult {
 
   const block: AmbiguityBlock = {
     kind: 'ambiguity',
-    prompt: `I found ${matches.length} employees matching that query. Which one do you mean?`,
+    prompt: `I found ${matches.length} employees${quoted}. Which one do you mean?`,
     candidates,
   };
 
   return {
     intent: 'ambiguity',
-    context: { count: matches.length, candidateIds: matches.map((m) => m.id) },
-    answer: `I found ${matches.length} employees matching that query. Select an employee to view details or continue asking questions:`,
+    context: { count: matches.length, term: term ?? null, candidateIds: matches.map((m) => m.id) },
+    answer: `I found ${matches.length} employees${quoted}. Which one do you mean?`,
     blocks: [block],
     actions,
+    suggestions: [],
     tone: 'normal',
   };
+}
+
+/** Distinguishes "no such department" from "no results", per error-handling rules. */
+function departmentNotFound(name: string, ctx: AiDataContext): AiResult {
+  const known = ctx.departments.slice(0, 4).map((d) => d.name);
+  return {
+    intent: 'department-scoped',
+    context: { query: name, known },
+    answer:
+      `I couldn't find a department matching "${name}".` +
+      (known.length ? `\n\nDepartments on record include: ${known.join(', ')}.` : ''),
+    actions: [{ kind: 'navigate', label: 'Open Departments', icon: 'pi pi-briefcase', route: '/departments' }],
+    suggestions: [],
+    tone: 'empty',
+    skipRephrase: true,
+  };
+}
+
+/**
+ * The department-ish name in an explicit scope such as "... in Finance".
+ * Pronoun scopes ("in her department") are resolved by the context layer and
+ * are deliberately excluded here.
+ */
+function explicitScopeName(text: string): string | null {
+  const m = text.match(
+    /\b(?:in|for|within|under|from)\s+(?:the\s+)?([a-z][a-z0-9&' -]{1,30}?)(?:\s+(?:department|dept|division|team))?\s*$/,
+  );
+  if (!m) return null;
+  const name = m[1].trim();
+  if (name.length < 2) return null;
+  if (/^(?:her|his|their|its|this|that|the|my|our|your|them|it|us)$/.test(name)) return null;
+  return name;
 }
 
 function noPersonResult(intent: AiIntentKind, query: string): AiResult {
@@ -884,6 +1017,170 @@ function guideExportOrganogram(): AiResult {
   };
 }
 
+// ---- Conversational & Recovery Responses ------------------------------------
+
+const ask = (label: string, prompt: string, icon: string): AiAction => ({
+  kind: 'ask-prompt',
+  label,
+  icon,
+  prompt,
+});
+
+const suggest = (label: string, query: string, icon: string): AiSuggestion => ({ label, query, icon });
+
+/**
+ * Picks a real department name so starter prompts reference live data rather
+ * than a hard-coded example that may not exist in this tenant.
+ */
+function sampleDeptName(ctx: AiDataContext): string {
+  const byHeadcount = [...ctx.departments].sort(
+    (a, b) => ctx.staff.filter((s) => s.deptId === b.id).length - ctx.staff.filter((s) => s.deptId === a.id).length,
+  );
+  return byHeadcount[0]?.name ?? 'Finance';
+}
+
+function greetingResult(ctx: AiDataContext): AiResult {
+  return {
+    intent: 'greeting',
+    context: { kind: 'greeting' },
+    answer:
+      'Hi! What would you like to know about your organization?\n\n' +
+      'I can help you find employees, explore departments, check vacancies, ' +
+      'understand reporting lines and view organisation insights.',
+    actions: [],
+    suggestions: [
+      suggest('Find an employee', 'Find an employee', 'pi pi-search'),
+      suggest('Show open vacancies', 'Show open vacancies', 'pi pi-inbox'),
+      suggest('Explore departments', 'Show department sizes', 'pi pi-building'),
+      suggest('Organisation overview', `Who heads ${sampleDeptName(ctx)}?`, 'pi pi-chart-bar'),
+    ],
+    tone: 'normal',
+    skipRephrase: true,
+  };
+}
+
+function courtesyResult(): AiResult {
+  return {
+    intent: 'courtesy',
+    context: { kind: 'courtesy' },
+    answer: "You're welcome. Anything else you'd like to know?",
+    actions: [],
+    suggestions: [
+      suggest('Show open vacancies', 'Show open vacancies', 'pi pi-inbox'),
+      suggest('Who joined recently?', 'Who joined recently?', 'pi pi-calendar'),
+      suggest('Explore departments', 'Show department sizes', 'pi pi-building'),
+    ],
+    tone: 'normal',
+    skipRephrase: true,
+  };
+}
+
+/**
+ * The full capability reference. Shown only when the user explicitly asks —
+ * never as the reply to a query the engine merely failed to understand.
+ */
+function capabilityResult(ctx: AiDataContext): AiResult {
+  const person = ctx.staff[0]?.name ?? 'Sarah Perera';
+  const first = firstName(person);
+  const dept = sampleDeptName(ctx);
+  const otherDept = ctx.departments.find((d) => d.name !== dept)?.name ?? 'Operations';
+
+  const block: CapabilityBlock = {
+    kind: 'capability',
+    groups: [
+      {
+        title: 'People',
+        icon: 'pi pi-users',
+        examples: [
+          { label: `Find ${person}`, query: `Find ${person}` },
+          { label: `Who is ${first}'s manager?`, query: `Who is the manager of ${person}?` },
+          { label: `Who reports to ${first}?`, query: `Who reports to ${person}?` },
+          { label: `Show employees in ${dept}`, query: `Show employees in ${dept}` },
+        ],
+      },
+      {
+        title: 'Organisation',
+        icon: 'pi pi-building',
+        examples: [
+          { label: `Who heads ${dept}?`, query: `Who heads ${dept}?` },
+          { label: `Compare ${dept} and ${otherDept}`, query: `Compare ${dept} and ${otherDept}` },
+          { label: 'Show department sizes', query: 'Which department has the most employees?' },
+        ],
+      },
+      {
+        title: 'Vacancies',
+        icon: 'pi pi-inbox',
+        examples: [
+          { label: 'Show open vacancies', query: 'Show open vacancies' },
+          { label: `Vacancies in ${dept}`, query: `Vacancies in ${dept}` },
+        ],
+      },
+      {
+        title: 'Insights',
+        icon: 'pi pi-chart-bar',
+        examples: [
+          { label: 'Who joined recently?', query: 'Who joined recently?' },
+          { label: 'Which departments have no head?', query: 'Which departments have no head?' },
+        ],
+      },
+    ],
+  };
+
+  return {
+    intent: 'capabilities',
+    context: { kind: 'capabilities' },
+    answer: 'Here is what I can help with — tap any example to run it.',
+    blocks: [block],
+    actions: [],
+    suggestions: [],
+    tone: 'normal',
+    skipRephrase: true,
+  };
+}
+
+/**
+ * Compact recovery for a query we could not map. Replaces the former
+ * six-bullet help dump, which consumed most of the panel on every miss.
+ */
+function compactUnknown(query: string): AiResult {
+  const shown = query.length > 40 ? `${query.slice(0, 40)}…` : query;
+  return {
+    intent: 'unknown',
+    context: { query },
+    answer:
+      `I'm not sure what you mean by "${shown}".\n\n` +
+      'Try asking about an employee, department, vacancy or reporting line.',
+    actions: [
+      ask('See examples', 'What can you do?', 'pi pi-list'),
+      ask('Find employee', 'Find an employee', 'pi pi-search'),
+    ],
+    suggestions: [],
+    tone: 'empty',
+    skipRephrase: true,
+  };
+}
+
+/**
+ * Offered when scoring found a likely interpretation but not a confident one —
+ * a typo, or a phrasing close to a known concept. The user confirms rather than
+ * the engine guessing, so a wrong reading is never presented as a fact.
+ */
+function didYouMeanResult(query: string, label: string, canonicalQuery: string, confidence: number): AiResult {
+  return {
+    intent: 'did-you-mean',
+    context: { query, suggestion: canonicalQuery, confidence },
+    answer: `Did you mean "${label}"?`,
+    actions: [
+      ask(label, canonicalQuery, 'pi pi-check'),
+      ask('See examples', 'What can you do?', 'pi pi-list'),
+    ],
+    suggestions: [],
+    confidence,
+    tone: 'empty',
+    skipRephrase: true,
+  };
+}
+
 function helpResult(): AiResult {
   return {
     intent: 'help',
@@ -899,6 +1196,151 @@ function helpResult(): AiResult {
       '• Show open vacancies\n' +
       '• Guide me how to add a staff',
     actions: [],
+    tone: 'normal',
+  };
+}
+
+// ---- Concept Detectors ------------------------------------------------------
+//
+// Each detector answers "is this query about X?" from the normalised text, so
+// synonyms live in intent-vocabulary.ts instead of being duplicated per branch.
+// Possessives are already folded by the normaliser ("Sarah's manager" reads as
+// "sarah manager"), which is what lets the short forms below work.
+
+/** "Who is X's manager?", "Sarah manager", "who does X report to", "managed by". */
+function isManagerOfQuery(text: string): boolean {
+  return (
+    /\b(?:manager|boss|supervisor|superior)\s+of\b/.test(text) ||
+    /\bwho\s+(?:is|are)\b.*\b(?:manager|boss|supervisor|superior)\b/.test(text) ||
+    /\bwho\s+manages\b/.test(text) ||
+    /\bwho\s+does\b.*\breports?\s+to\b/.test(text) ||
+    /\breports?\s+to\s+who(?:m)?\b/.test(text) ||
+    /\b(?:my|her|his|their|this|that|the)\s+(?:line\s+)?(?:manager|boss|supervisor)\b/.test(text) ||
+    /\bmanaged\s+by\b/.test(text) ||
+    // Trailing role word: "Sarah manager", "Finance boss".
+    /\b(?:manager|boss|supervisor)\s*$/.test(text)
+  );
+}
+
+/** "Who heads Finance?", "Finance head", "head of Operations", "led by". */
+function isDepartmentHeadQuery(text: string): boolean {
+  return (
+    /\b(?:head|hod)\s+of\b/.test(text) ||
+    /\bdepartment\s+head\b/.test(text) ||
+    /\bwho\s+(?:heads|leads|runs)\b/.test(text) ||
+    /\b(?:headed|led|run)\s+by\b/.test(text) ||
+    /\bin\s+charge\s+of\b/.test(text) ||
+    /\bhead\s*$/.test(text)
+  );
+}
+
+/** "Who reports to Sarah?", "her direct reports", "who works under X". */
+function isDirectReportsQuery(text: string): boolean {
+  if (/\breport\s+(?:a|an|the)?\s*(?:bug|issue|problem)\b/.test(text)) return false;
+  return (
+    /\bwho\s+reports?\s+to\b/.test(text) ||
+    /\bdirect\s+reports?\b/.test(text) ||
+    /\breports?\s+of\b/.test(text) ||
+    /\bteam\s+of\b/.test(text) ||
+    /\bwho\s+works\s+(?:for|under)\b/.test(text) ||
+    /\breport(?:s|ing)?\b/.test(text)
+  );
+}
+
+/**
+ * Staff whose job title matches the query phrase — "Operations Manager".
+ *
+ * Deliberately conservative: only whole-phrase containment, and only for
+ * queries short enough to plausibly *be* a title, so a long sentence never
+ * matches a person because it happens to contain the word "Director".
+ */
+function matchStaffByTitle(text: string, ctx: AiDataContext): Staff[] {
+  const phrase = text.trim();
+  if (phrase.length < 4 || phrase.split(/\s+/).length > 5) return [];
+
+  const exact = ctx.staff.filter((s) => (s.title ?? '').toLowerCase() === phrase);
+  if (exact.length) return exact;
+
+  return ctx.staff.filter((s) => {
+    const title = (s.title ?? '').toLowerCase();
+    if (title.length < 4) return false;
+    return title.includes(phrase) || phrase.includes(title);
+  });
+}
+
+/** True when the query asks to search staff but names nobody in particular. */
+function isBareEmployeeSearch(nq: NormalizedQuery): boolean {
+  const words = nq.coreTokens.filter((t) => !['find', 'search', 'lookup', 'look', 'up', 'for', 'show', 'list'].includes(t));
+  return words.length > 0 && words.every((w) => hasTerm(w, EMPLOYEE_TERMS));
+}
+
+function employeeSearchPrompt(): AiResult {
+  return {
+    intent: 'find-employee',
+    context: { needs: 'employee-identifier' },
+    answer:
+      'Who are you looking for? Type a name, employee code (e.g. EMP-001), email address or mobile number.\n\n' +
+      'You can also ask for a whole department, such as "Show employees in Finance".',
+    actions: [{ kind: 'navigate', label: 'Open Staff directory', icon: 'pi pi-users', route: '/staff' }],
+    suggestions: [],
+    tone: 'empty',
+    skipRephrase: true,
+  };
+}
+
+function titleSearchResult(matches: Staff[], phrase: string, ctx: AiDataContext): AiResult {
+  const blocks = matches.slice(0, 6).map((s) => buildEmployeeBlock(s, ctx));
+  return {
+    intent: 'positions-by-title',
+    context: { title: phrase, count: matches.length, names: matches.map((m) => m.name) },
+    answer:
+      `${plural(matches.length, 'employee')} match "${phrase}":\n` +
+      matches.slice(0, 10).map((s) => `• ${s.name} — ${s.title} (${ctx.deptName(s.deptId)})`).join('\n'),
+    blocks,
+    actions: [{ kind: 'navigate', label: 'Open Staff directory', icon: 'pi pi-users', route: '/staff' }],
+    updatedContext:
+      matches.length === 1
+        ? {
+            staffId: matches[0].id,
+            staffName: matches[0].name,
+            departmentId: matches[0].deptId,
+            departmentName: ctx.deptName(matches[0].deptId),
+            lastEntityType: 'staff',
+            lastIntent: 'positions-by-title',
+          }
+        : { lastIntent: 'positions-by-title' },
+    tone: 'normal',
+  };
+}
+
+/** Answers "who heads X" for a resolved department. */
+function departmentHeadResult(dept: Department, ctx: AiDataContext): AiResult {
+  const head = dept.headStaffId != null ? ctx.staff.find((s) => s.id === dept.headStaffId) : null;
+  if (!head) {
+    return {
+      intent: 'department-head',
+      context: { department: dept.name, head: null },
+      answer: `${dept.name} has no department head assigned.`,
+      blocks: [buildDepartmentBlock(dept, ctx)],
+      actions: [{ kind: 'navigate', label: 'Open Departments', icon: 'pi pi-briefcase', route: '/departments' }],
+      updatedContext: { departmentId: dept.id, departmentName: dept.name, lastEntityType: 'department', lastIntent: 'department-head' },
+      tone: 'empty',
+    };
+  }
+  return {
+    intent: 'department-head',
+    context: { department: dept.name, head: head.name },
+    answer: `${dept.name} is headed by ${head.name}${head.title ? `, ${head.title}` : ''}.`,
+    blocks: [buildDepartmentBlock(dept, ctx), buildEmployeeBlock(head, ctx)],
+    actions: [focusAction(head), { kind: 'navigate', label: `View ${dept.name} Staff`, route: '/staff', deptId: dept.id, icon: 'pi pi-users' }],
+    updatedContext: {
+      staffId: head.id,
+      staffName: head.name,
+      departmentId: dept.id,
+      departmentName: dept.name,
+      lastEntityType: 'staff',
+      lastIntent: 'department-head',
+    },
     tone: 'normal',
   };
 }
@@ -920,9 +1362,21 @@ export function interpret(rawQuery: string, ctx: AiDataContext): AiResult {
     };
   }
 
-  const q = query.toLowerCase();
-  const normalized = q.replace(/[?!.,;:'"“”]/g, ' ').replace(/\s+/g, ' ').trim();
+  const nq = normalizeQuery(query);
+  const q = nq.lower;
+  const normalized = nq.text;
   const isGuide = /\b(guide|how\s+to|how\s+do\s+i|steps\s+to|where\s+to|teach|tutorial|instructions|walkthrough)\b/i.test(normalized);
+
+  // 1b. Small talk — answered conversationally, never sent to a data lookup.
+  if (!isGuide) {
+    const smallTalk = detectSmallTalk(nq);
+    if (smallTalk === 'greeting') return greetingResult(ctx);
+    if (smallTalk === 'courtesy') return courtesyResult();
+  }
+
+  // 1c. Capability questions ("what can you do?", "examples", bare "help").
+  // Guarded on entities so "help me find Sarah" stays an employee lookup.
+  if (!isGuide && isCapabilityQuery(nq, namesConcreteEntity(query, ctx))) return capabilityResult(ctx);
 
   // 2. Step-by-Step How-To Guides
   if (isGuide) {
@@ -960,28 +1414,24 @@ export function interpret(rawQuery: string, ctx: AiDataContext): AiResult {
     return evaluateDataQuality(q, ctx);
   }
 
-  // 5. Reporting Chain: "Show Sarah's reporting chain", "Who is Sarah's manager's manager?"
-  if (/\b(reporting chain|management chain|chain of command|levels below|manager.s manager|boss.s boss)\b/i.test(q)) {
+  // 5. Reporting Chain: "Show Sarah's reporting chain", "How does Sarah report up to the CEO?"
+  if (hasTerm(normalized, CHAIN_TERMS) || /\b(?:levels below|manager.s manager|boss.s boss)\b/i.test(q)) {
     const people = matchStaffWithContext(query, ctx);
     if (people.length === 1) return getReportingChain(people[0], ctx);
-    if (people.length > 1) return handleAmbiguousStaff(people, ctx);
+    if (people.length > 1) return handleAmbiguousStaff(people, ctx, searchTermFor(query, people));
     return noPersonResult('reporting-chain', query);
   }
 
-  // 6. Team Hierarchy: "Show Sarah's team", "How big is Sarah's team?", "Everyone under Sarah"
-  if (/\b(whole team|full team|extended team|team size|everyone under|all reports|entire team)\b/i.test(q)) {
+  // 6. Team Hierarchy: "Show Sarah's whole team", "Everyone under Sarah"
+  if (hasTerm(normalized, FULL_TEAM_TERMS)) {
     const people = matchStaffWithContext(query, ctx);
     if (people.length === 1) return getTeamHierarchy(people[0], ctx);
-    if (people.length > 1) return handleAmbiguousStaff(people, ctx);
+    if (people.length > 1) return handleAmbiguousStaff(people, ctx, searchTermFor(query, people));
     return noPersonResult('team-hierarchy', query);
   }
 
-  // 7. Manager Of / Direct Supervisor:
-  if (
-    /\b(manager of|who manages|who is (the |her |his |their |this |my )?manager|who.s (the |her |his |their |my )?manager|boss of|who does .* report to|my manager|her manager|his manager|their manager)\b/i.test(
-      q,
-    )
-  ) {
+  // 7. Manager Of / Direct Supervisor: "Who manages Sarah?", "Sarah's boss", "Finance manager"
+  if (isManagerOfQuery(normalized)) {
     const people = matchStaffWithContext(query, ctx);
     if (people.length === 1) {
       const person = people[0];
@@ -1020,18 +1470,21 @@ export function interpret(rawQuery: string, ctx: AiDataContext): AiResult {
       };
     }
 
-    const dept = matchDepartmentWithContext(query, ctx);
-    if (dept) return getDepartmentDetail(dept, ctx);
+    // "Operations Manager" is a job title before it is a question about a
+    // department's leader, so a title hit wins over the department fallback.
+    const byTitle = matchStaffByTitle(normalized, ctx);
+    if (byTitle.length) return titleSearchResult(byTitle, normalized, ctx);
 
-    if (people.length > 1) return handleAmbiguousStaff(people, ctx);
+    // "Who manages Finance?" / "Finance manager" — the department's head.
+    const dept = matchDepartmentWithContext(query, ctx);
+    if (dept) return departmentHeadResult(dept, ctx);
+
+    if (people.length > 1) return handleAmbiguousStaff(people, ctx, searchTermFor(query, people));
     return noPersonResult('manager-of', query);
   }
 
   // 8. Direct Reports: "Who reports to Sarah?", "Who reports to her?", "Her direct reports"
-  if (
-    /\breport(s|ing)?\b|\bdirect reports?\b|\bteam of\b|\bwho works (for|under)\b/.test(q) &&
-    !/report\s+(a|an|the)?\s*(bug|issue)/.test(q)
-  ) {
+  if (isDirectReportsQuery(normalized)) {
     const people = matchStaffWithContext(query, ctx);
     if (people.length === 1) {
       const person = people[0];
@@ -1065,12 +1518,12 @@ export function interpret(rawQuery: string, ctx: AiDataContext): AiResult {
         tone: direct.length ? 'normal' : 'empty',
       };
     }
-    if (people.length > 1) return handleAmbiguousStaff(people, ctx);
+    if (people.length > 1) return handleAmbiguousStaff(people, ctx, searchTermFor(query, people));
     return noPersonResult('reporting-hierarchy', query);
   }
 
   // 9. Contact details: "Contact details for Sarah", "What is her email/phone?"
-  if (/\bcontact\b|\be-?mail\b|\bphone\b|\bnumber\b|\breach\b|\bcall\b|\bmobile\b|\blandline\b|\bextension\b/.test(q)) {
+  if (hasTerm(normalized, CONTACT_TERMS) || /\bnumber\b|\bcall\b/.test(normalized)) {
     const people = matchStaffWithContext(query, ctx);
     if (people.length === 1) {
       const person = people[0];
@@ -1102,54 +1555,70 @@ export function interpret(rawQuery: string, ctx: AiDataContext): AiResult {
         tone: lines.length ? 'normal' : 'empty',
       };
     }
-    if (people.length > 1) return handleAmbiguousStaff(people, ctx);
+    if (people.length > 1) return handleAmbiguousStaff(people, ctx, searchTermFor(query, people));
     return noPersonResult('contact-info', query);
   }
 
-  // 10. Vacancies (General or Scoped): "Any vacancies in her department?", "Vacancies in IT", "Show open vacancies"
-  if (/\b(vacanc(y|ies)?|open\s+positions?|jobs?|openings?|hiring)\b/i.test(q)) {
+  // 10. Vacancies (General or Scoped): "Any vacancies in her department?", "Vacancies in IT", "vacant positions"
+  if (hasTerm(normalized, VACANCY_TERMS)) {
     const dept = matchDepartmentWithContext(query, ctx);
     if (dept) {
-      const vacs = ctx.positions.filter((p) => p.deptId === dept.id && p.isVacant && p.status !== 'CLOSED');
-      const vacBlocks = vacs.map((v) => buildPositionBlock(v, ctx));
+      const vacs = openVacancies(ctx, dept.id);
       const answer = vacs.length
-        ? `There ${vacs.length === 1 ? 'is' : 'are'} ${plural(vacs.length, 'open vacancy')} in ${dept.name}:\n` +
+        ? `${dept.name} currently has ${plural(vacs.length, 'open vacancy', 'open vacancies')}:\n` +
           vacs.map((v) => `• ${v.title}`).join('\n')
-        : `There are currently no open vacancies in ${dept.name}.`;
+        : `${dept.name} currently has no open vacancies.`;
 
       return {
         intent: 'vacancies',
-        context: { department: dept.name, openCount: vacs.length },
+        context: { department: dept.name, openCount: vacs.length, titles: vacs.map((v) => v.title) },
         answer,
-        blocks: [buildDepartmentBlock(dept, ctx), ...vacBlocks],
-        actions: [{ kind: 'navigate', label: `View ${dept.name} Vacancies`, route: '/vacancies', deptId: dept.id, icon: 'pi pi-inbox' }],
-        updatedContext: { departmentId: dept.id, departmentName: dept.name, lastEntityType: 'department', lastIntent: 'vacancies' },
+        blocks: vacs.length
+          ? [buildVacancySummaryBlock(vacs, ctx, dept)]
+          : [buildDepartmentBlock(dept, ctx)],
+        actions: [
+          { kind: 'navigate', label: `View ${dept.name} Vacancies`, route: '/vacancies', deptId: dept.id, icon: 'pi pi-inbox' },
+        ],
+        updatedContext: { departmentId: dept.id, departmentName: dept.name, lastEntityType: 'vacancy', lastIntent: 'vacancies' },
         tone: vacs.length ? 'normal' : 'empty',
       };
     }
 
-    const open = ctx.positions.filter((p) => p.isVacant && p.status !== 'CLOSED');
-    const byDept = new Map<string, number>();
-    for (const p of open) byDept.set(ctx.deptName(p.deptId), (byDept.get(ctx.deptName(p.deptId)) ?? 0) + 1);
+    // "Vacancies in Treasury" must not silently answer with every vacancy in
+    // the group � an unresolvable scope is its own, distinct outcome.
+    const scope = explicitScopeName(normalized);
+    if (scope) return departmentNotFound(scope, ctx);
 
-    const vacBlocks = open.slice(0, 6).map((v) => buildPositionBlock(v, ctx));
+    const open = openVacancies(ctx);
+    const summary = buildVacancySummaryBlock(open, ctx);
     const answer = open.length
-      ? `There ${open.length === 1 ? 'is' : 'are'} ${plural(open.length, 'open vacancy', 'open vacancies')}:\n` +
-        [...byDept].map(([d, n]) => `• ${d}: ${n}`).join('\n')
+      ? `There ${open.length === 1 ? 'is' : 'are'} ${plural(open.length, 'open vacancy', 'open vacancies')} across ` +
+        `${plural(summary.departmentCount, 'department')}:\n` +
+        summary.byDepartment.map((d) => `• ${d.name}: ${d.count}`).join('\n')
       : 'There are currently no active open vacancies across the group.';
 
     return {
       intent: 'vacancies',
-      context: { openCount: open.length, byDepartment: [...byDept].map(([d, n]) => ({ department: d, count: n })) },
+      context: {
+        openCount: open.length,
+        byDepartment: summary.byDepartment.map((d) => ({ department: d.name, count: d.count })),
+      },
       answer,
-      blocks: vacBlocks,
-      actions: [
-        { kind: 'navigate', label: 'Open Vacancies', icon: 'pi pi-inbox', route: '/vacancies' },
-        { kind: 'navigate', label: 'Open Organogram', icon: 'pi pi-sitemap', route: '/organogram' },
-      ],
+      blocks: open.length ? [summary] : [],
+      // Department drill-down is offered as a follow-up suggestion, so it is
+      // deliberately not repeated as an action here.
+      actions: [{ kind: 'navigate', label: 'View vacancies', icon: 'pi pi-inbox', route: '/vacancies' }],
       updatedContext: { lastEntityType: 'vacancy', lastIntent: 'vacancies' },
       tone: open.length ? 'normal' : 'empty',
     };
+  }
+
+  // 10b. Department Head: "Who heads IT?", "Finance head", "head of Finance".
+  // Sits ahead of the department-scoped branch, which would otherwise swallow
+  // short forms like "Finance head" and answer with the full department card.
+  if (isDepartmentHeadQuery(normalized)) {
+    const headDept = matchDepartmentWithContext(query, ctx);
+    if (headDept) return departmentHeadResult(headDept, ctx);
   }
 
   // 11. Department-Scoped Staff & Managers Queries: "Show employees in Finance", "Managers in IT"
@@ -1178,42 +1647,20 @@ export function interpret(rawQuery: string, ctx: AiDataContext): AiResult {
     return getDepartmentDetail(deptMatch, ctx);
   }
 
+  // 11b. An explicit but unresolvable scope on a people query.
+  if (!deptMatch && hasTerm(normalized, EMPLOYEE_TERMS) && !matchCompanyWithContext(query, ctx)) {
+    const scope = explicitScopeName(normalized);
+    if (scope) return departmentNotFound(scope, ctx);
+  }
+
   // 12. Company-Scoped Queries: "Show employees in ABC Company", "How many employees does ABC have?"
   const compMatch = matchCompanyWithContext(query, ctx);
   if (compMatch && (/\b(employees|staff|departments|vacancies|positions|largest department)\b/i.test(q) || q.split(/\s+/).length <= 4)) {
     return getCompanyDetail(compMatch, ctx);
   }
 
-  // 13. Department Head: "Who heads IT?", "Who is the head of Finance?"
-  if (/\bwho (heads|leads|runs)\b|\bhead of\b|\bdepartment head\b/.test(q)) {
-    const dept = matchDepartmentWithContext(query, ctx);
-    if (dept) {
-      const head = dept.headStaffId != null ? ctx.staff.find((s) => s.id === dept.headStaffId) : null;
-      if (!head) {
-        return {
-          intent: 'department-head',
-          context: { department: dept.name, head: null },
-          answer: `${dept.name} has no department head assigned.`,
-          blocks: [buildDepartmentBlock(dept, ctx)],
-          actions: [{ kind: 'navigate', label: 'Open Departments', icon: 'pi pi-briefcase', route: '/departments' }],
-          updatedContext: { departmentId: dept.id, departmentName: dept.name, lastEntityType: 'department', lastIntent: 'department-head' },
-          tone: 'empty',
-        };
-      }
-      return {
-        intent: 'department-head',
-        context: { department: dept.name, head: head.name },
-        answer: `${dept.name} is headed by ${head.name}${head.title ? `, ${head.title}` : ''}.`,
-        blocks: [buildDepartmentBlock(dept, ctx), buildEmployeeBlock(head, ctx)],
-        actions: [focusAction(head), { kind: 'navigate', label: `View ${dept.name} Staff`, route: '/staff', deptId: dept.id, icon: 'pi pi-users' }],
-        updatedContext: { staffId: head.id, staffName: head.name, departmentId: dept.id, departmentName: dept.name, lastEntityType: 'staff', lastIntent: 'department-head' },
-        tone: 'normal',
-      };
-    }
-  }
-
   // 14. Joining & Recent Hires: "Who joined recently?", "When did Sarah join?"
-  if (/\bjoin(ed|ing|ers?)?\b|\brecent (hires?|staff|joiners?)\b|\bnew (hires?|joiners?|staff|employees?)\b|\bstart(ed|ing)? date\b/.test(q)) {
+  if (hasTerm(normalized, JOIN_TERMS)) {
     const named = matchStaffWithContext(query, ctx);
     if (named.length === 1 && /\bwhen\b|\bjoin(ed|ing)?\s+date\b|\bdate\b/.test(q)) {
       const person = named[0];
@@ -1289,11 +1736,14 @@ export function interpret(rawQuery: string, ctx: AiDataContext): AiResult {
     };
   }
   if (foundPeople.length > 1 && !isGuide) {
-    return handleAmbiguousStaff(foundPeople, ctx);
+    return handleAmbiguousStaff(foundPeople, ctx, searchTermFor(query, foundPeople));
   }
 
   // 16. Organization Stats / Largest Department: "Which department has the most employees?"
-  if (/\bmost employees\b|\blargest department\b|\bheadcount\b|\bdepartment (stats|size|breakdown)\b|\bbiggest (team|department)\b/.test(q)) {
+  if (
+    /\bmost employees\b|\blargest department\b|\bdepartment (stats|size|sizes|breakdown)\b|\bbiggest (team|department)\b/.test(normalized) ||
+    (hasTerm(normalized, HEADCOUNT_TERMS) && hasTerm(normalized, EMPLOYEE_TERMS))
+  ) {
     const counts = ctx.departments
       .map((d) => ({ dept: d, count: ctx.staff.filter((s) => s.deptId === d.id).length }))
       .sort((a, b) => b.count - a.count);
@@ -1319,27 +1769,22 @@ export function interpret(rawQuery: string, ctx: AiDataContext): AiResult {
     };
   }
 
-  // 17. Help Fallback
-  if (/\bhelp\b|\bwhat can you\b|\bhow do you\b|\bcommands\b/.test(q)) return helpResult();
+  // 17. Job-title search: "Operations Manager", "Senior Engineer"
+  const titleHits = matchStaffByTitle(normalized, ctx);
+  if (titleHits.length) return titleSearchResult(titleHits, normalized, ctx);
 
-  // 18. Unknown Fallback
-  return {
-    intent: 'unknown',
-    context: { query },
-    answer:
-      `I couldn't map "${query}" to OMS data.\n\n` +
-      `Try asking:\n` +
-      `• "Find Sarah Perera"\n` +
-      `• "Who is her manager?"\n` +
-      `• "Show employees in Finance"\n` +
-      `• "Compare Finance and Operations"\n` +
-      `• "Show open vacancies"\n` +
-      `• "Which departments have no head?"\n\n` +
-      `Type "help" for more examples.`,
-    actions: [
-      { kind: 'navigate', label: 'Open Staff directory', icon: 'pi pi-users', route: '/staff' },
-      { kind: 'navigate', label: 'Open Organogram', icon: 'pi pi-sitemap', route: '/organogram' },
-    ],
-    tone: 'empty',
-  };
+  // 17b. "Find an employee" with no identifier — ask for one instead of guessing.
+  if (isBareEmployeeSearch(nq)) return employeeSearchPrompt();
+
+  // 18. Explicit help request
+  if (/\bhelp\b|\bwhat can you\b|\bhow do you\b|\bcommands\b/.test(normalized)) return capabilityResult(ctx);
+
+  // 19. Recovery: a scored interpretation the user can confirm, rather than a
+  // wall of examples. Anything below the clarify floor gets the compact reply.
+  const guess = bestIntent(nq);
+  if (guess && guess.confidence >= CONFIDENCE.clarify) {
+    return didYouMeanResult(query, guess.label, guess.canonicalQuery, guess.confidence);
+  }
+
+  return compactUnknown(query);
 }

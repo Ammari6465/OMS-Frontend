@@ -40,6 +40,10 @@ export type AiIntentKind =
   | 'how-to'
   | 'guide'
   | 'help'
+  | 'greeting'
+  | 'courtesy'
+  | 'capabilities'
+  | 'did-you-mean'
   | 'unknown'
   | 'denied';
 
@@ -186,6 +190,35 @@ export interface DataQualityBlock {
   issues: DataQualityIssue[];
 }
 
+/** Scannable roll-up for "any vacancies?" — totals plus a per-department split. */
+export interface VacancySummaryBlock {
+  kind: 'vacancy-summary';
+  /** Present when the question was scoped to one department. */
+  scopeName?: string | null;
+  scopeDeptId?: number | null;
+  totalOpen: number;
+  departmentCount: number;
+  byDepartment: { name: string; deptId?: number | null; count: number }[];
+  titles: string[];
+}
+
+export interface CapabilityExample {
+  label: string;
+  query: string;
+}
+
+export interface CapabilityGroup {
+  title: string;
+  icon: string;
+  examples: CapabilityExample[];
+}
+
+/** Grouped "what can you ask" reference, shown only when explicitly requested. */
+export interface CapabilityBlock {
+  kind: 'capability';
+  groups: CapabilityGroup[];
+}
+
 export type AskOmsBlock =
   | EmployeeBlock
   | DepartmentBlock
@@ -193,7 +226,9 @@ export type AskOmsBlock =
   | ComparisonBlock
   | ReportingChainBlock
   | AmbiguityBlock
-  | DataQualityBlock;
+  | DataQualityBlock
+  | VacancySummaryBlock
+  | CapabilityBlock;
 
 export interface AiSuggestion {
   label: string;
@@ -213,6 +248,13 @@ export interface AiResult {
   blocks?: AskOmsBlock[];
   updatedContext?: Partial<AskOmsContext>;
   suggestions?: AiSuggestion[];
+  /** Intent-match score, when the result came from the scoring layer. */
+  confidence?: number;
+  /**
+   * True for results a provider must not rephrase — greetings, help screens and
+   * clarifications are UI copy, not data-derived prose.
+   */
+  skipRephrase?: boolean;
 }
 
 export interface AiMessage {

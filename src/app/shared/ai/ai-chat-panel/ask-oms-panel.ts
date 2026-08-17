@@ -36,12 +36,14 @@ import { AiMessageComponent } from '../ai-message/ai-message';
             </div>
           </div>
           <div class="ai-head-actions">
+            <button type="button" class="ai-icon" (click)="showAbout = !showAbout"
+              [attr.aria-expanded]="showAbout" aria-label="About Ask OMS" title="About Ask OMS">
+              <i class="pi pi-info-circle"></i>
+            </button>
             @if (ai.messages().length) {
-              <button type="button" class="ai-icon" (click)="ai.reset()" aria-label="New conversation" title="New conversation">
-                <i class="pi pi-plus-circle"></i>
-              </button>
-              <button type="button" class="ai-icon" (click)="ai.reset()" aria-label="Clear conversation" title="Clear conversation">
-                <i class="pi pi-eraser"></i>
+              <button type="button" class="ai-icon" (click)="newConversation()"
+                aria-label="New conversation" title="New conversation">
+                <i class="pi pi-pencil"></i>
               </button>
             }
             <button type="button" class="ai-icon" (click)="ai.close()" aria-label="Close Ask OMS" title="Close">
@@ -49,6 +51,16 @@ import { AiMessageComponent } from '../ai-message/ai-message';
             </button>
           </div>
         </header>
+
+        @if (showAbout) {
+          <div class="ai-about" role="note">
+            <strong>How Ask OMS works</strong>
+            <p>
+              Ask OMS answers organizational questions using authorized OMS records. Organizational facts are
+              retrieved from OMS data rather than invented by AI.
+            </p>
+          </div>
+        }
 
         <!-- Conversational Context Indicator Bar -->
         @if (ai.sessionContext().staffName || ai.sessionContext().departmentName || ai.sessionContext().companyName) {
@@ -79,9 +91,9 @@ import { AiMessageComponent } from '../ai-message/ai-message';
           @if (!ai.messages().length) {
             <div class="ai-welcome">
               <span class="ai-mark lg"><i class="pi pi-sparkles"></i></span>
-              <h3>How can I help?</h3>
-              <p>Ask about employees, managers, team hierarchies, vacancies, department comparisons, or find anyone in the Organogram.</p>
+              <h3>What would you like to know?</h3>
               <app-ai-suggestions [suggestions]="ai.suggestions()" (pick)="send($event)" />
+              <p class="ai-try">{{ ai.exampleHint() }}</p>
             </div>
           } @else {
             <div class="ai-thread">
@@ -92,16 +104,21 @@ import { AiMessageComponent } from '../ai-message/ai-message';
           }
         </div>
 
+        @if (ai.busy()) {
+          <p class="ai-status" role="status">
+            <i class="pi pi-spin pi-spinner"></i>Ask OMS is checking your organisation…
+          </p>
+        }
+
         <form class="ai-input" (submit)="submit($event)">
-          <textarea #box rows="1" [value]="draft" (input)="draft = $any($event.target).value"
+          <textarea #box rows="1" [value]="draft" (input)="onInput($event)"
             (keydown)="onKey($event)" [disabled]="ai.busy()"
-            placeholder="Ask about your organisation (e.g. Find Sarah, Who reports to her?)..."
+            placeholder="Ask OMS anything…"
             aria-label="Ask OMS a question"></textarea>
           <button type="submit" class="ai-send" [disabled]="ai.busy() || !draft.trim()" aria-label="Send question">
             <i class="pi" [class.pi-send]="!ai.busy()" [class.pi-spin]="ai.busy()" [class.pi-spinner]="ai.busy()"></i>
           </button>
         </form>
-        <p class="ai-foot">Ask OMS derives answers deterministically from live OMS records. Context is maintained for this session.</p>
       </aside>
     }
   `,
@@ -162,15 +179,29 @@ import { AiMessageComponent } from '../ai-message/ai-message';
       .clear-ctx-btn { border: none; background: transparent; color: var(--p-text-muted-color); cursor: pointer; padding: 2px; border-radius: 4px; font-size: 0.75rem; }
       .clear-ctx-btn:hover { color: var(--p-primary-color); }
 
+      .ai-about {
+        padding: 0.7rem 1rem; border-bottom: 1px solid var(--p-content-border-color);
+        background: color-mix(in srgb, var(--p-primary-color) 6%, var(--p-content-background));
+      }
+      .ai-about strong { display: block; font-size: 0.8rem; margin-bottom: 0.2rem; }
+      .ai-about p { margin: 0; font-size: 0.75rem; line-height: 1.45; color: var(--p-text-muted-color); }
+
       .ai-body { flex: 1; overflow-y: auto; padding: 1rem; }
       .ai-welcome { text-align: center; padding: 0.5rem 0.25rem 0; }
-      .ai-welcome h3 { margin: 0.75rem 0 0.3rem; font-size: 1.05rem; }
-      .ai-welcome > p { margin: 0 auto 1.1rem; max-width: 21rem; font-size: 0.84rem; color: var(--p-text-muted-color); }
+      .ai-welcome h3 { margin: 0.75rem 0 1rem; font-size: 1.05rem; }
+      .ai-try { margin: 1rem 0 0; font-size: 0.78rem; color: var(--p-text-muted-color); font-style: italic; }
       .ai-thread { display: flex; flex-direction: column; gap: 0.85rem; }
+
+      .ai-status {
+        display: flex; align-items: center; gap: 0.4rem; margin: 0; padding: 0.4rem 0.95rem;
+        font-size: 0.74rem; color: var(--p-text-muted-color);
+      }
 
       .ai-input { display: flex; align-items: flex-end; gap: 0.5rem; padding: 0.75rem; border-top: 1px solid var(--p-content-border-color); }
       .ai-input textarea {
-        flex: 1; resize: none; max-height: 120px; padding: 0.6rem 0.75rem; border-radius: 12px; font: inherit; font-size: 0.88rem;
+        /* Grows to roughly three lines, then scrolls. */
+        flex: 1; resize: none; min-height: 40px; max-height: 76px; overflow-y: auto;
+        padding: 0.6rem 0.75rem; border-radius: 12px; font: inherit; font-size: 0.88rem; line-height: 1.35;
         border: 1px solid var(--p-content-border-color); background: var(--p-content-background); color: var(--p-text-color); outline: none;
       }
       .ai-input textarea:focus { border-color: var(--p-primary-color); }
@@ -196,6 +227,7 @@ export class AskOmsPanel {
   private readonly scroll = viewChild<ElementRef<HTMLElement>>('scroll');
 
   draft = '';
+  showAbout = false;
 
   constructor() {
     // Focus the input when the panel opens.
@@ -227,6 +259,20 @@ export class AskOmsPanel {
       event.preventDefault();
       this.send(this.draft);
     }
+  }
+
+  /** Grows the box with the question, up to the CSS max-height. */
+  onInput(event: Event): void {
+    const el = event.target as HTMLTextAreaElement;
+    this.draft = el.value;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }
+
+  newConversation(): void {
+    this.ai.reset();
+    this.showAbout = false;
+    this.draft = '';
   }
 
   submit(event: Event): void {

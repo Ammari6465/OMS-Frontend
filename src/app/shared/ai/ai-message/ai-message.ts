@@ -256,7 +256,66 @@ import {
                     </div>
                   }
 
-                  <!-- 7. Data Quality Issues Card -->
+                  <!-- 7. Vacancy Roll-Up -->
+                  @if (b.kind === 'vacancy-summary') {
+                    <div class="card vac-card">
+                      <div class="vac-head">
+                        <div>
+                          <strong>{{ b.scopeName ? b.scopeName + ' Vacancies' : 'Open Vacancies' }}</strong>
+                          <div class="emp-title">
+                            {{ b.totalOpen }} {{ b.totalOpen === 1 ? 'position' : 'positions' }}
+                            @if (!b.scopeName) {
+                              across {{ b.departmentCount }}
+                              {{ b.departmentCount === 1 ? 'department' : 'departments' }}
+                            }
+                          </div>
+                        </div>
+                        <span class="vac-total">{{ b.totalOpen }}</span>
+                      </div>
+
+                      @if (!b.scopeName && b.byDepartment.length > 1) {
+                        <div class="vac-rows">
+                          @for (row of b.byDepartment; track row.name) {
+                            <button type="button" class="vac-row" (click)="askVacanciesIn(row.name)">
+                              <span class="vac-dept">{{ row.name }}</span>
+                              <span class="vac-bar" [style.width.%]="barWidth(row.count, b.totalOpen)"></span>
+                              <span class="vac-count">{{ row.count }}</span>
+                            </button>
+                          }
+                        </div>
+                      } @else if (b.titles.length) {
+                        <ul class="vac-titles">
+                          @for (t of b.titles.slice(0, 8); track $index) {
+                            <li>{{ t }}</li>
+                          }
+                        </ul>
+                        @if (b.titles.length > 8) {
+                          <div class="vac-more">…and {{ b.titles.length - 8 }} more</div>
+                        }
+                      }
+
+                    </div>
+                  }
+
+                  <!-- 8. Capability Reference -->
+                  @if (b.kind === 'capability') {
+                    <div class="card cap-card">
+                      @for (g of b.groups; track g.title) {
+                        <div class="cap-group">
+                          <div class="cap-title"><i [class]="g.icon"></i>{{ g.title }}</div>
+                          <div class="cap-examples">
+                            @for (ex of g.examples; track ex.query) {
+                              <button type="button" class="cap-chip" (click)="askSuggestion(ex.query)">
+                                {{ ex.label }}
+                              </button>
+                            }
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  }
+
+                  <!-- 9. Data Quality Issues Card -->
                   @if (b.kind === 'data-quality') {
                     <div class="card quality-card">
                       <div class="qual-head">
@@ -407,6 +466,45 @@ import {
       .cand-sub { font-size: 0.72rem; color: var(--p-text-muted-color); margin-top: 1px; }
       .cand-arrow { font-size: 0.75rem; color: var(--p-text-muted-color); }
 
+      /* Vacancy Roll-Up */
+      .vac-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.6rem; }
+      .vac-total {
+        font-size: 1.35rem; font-weight: 800; line-height: 1; color: var(--p-primary-color);
+        background: color-mix(in srgb, var(--p-primary-color) 12%, transparent);
+        border-radius: 9px; padding: 0.3rem 0.6rem;
+      }
+      .vac-rows { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.6rem; }
+      .vac-row {
+        display: grid; grid-template-columns: minmax(5rem, 8rem) 1fr auto; align-items: center; gap: 0.5rem;
+        padding: 0.3rem 0.45rem; border: 1px solid transparent; border-radius: 7px;
+        background: transparent; color: var(--p-text-color); font-size: 0.78rem; cursor: pointer; text-align: left;
+      }
+      .vac-row:hover { border-color: var(--p-primary-color); background: color-mix(in srgb, var(--p-primary-color) 8%, transparent); }
+      .vac-dept { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .vac-bar {
+        height: 6px; min-width: 4px; border-radius: 99px; justify-self: start;
+        background: color-mix(in srgb, var(--p-primary-color) 55%, transparent);
+      }
+      .vac-count { font-weight: 700; color: var(--p-primary-color); }
+      .vac-titles { margin: 0.55rem 0 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.78rem; }
+      .vac-more { font-size: 0.72rem; color: var(--p-text-muted-color); margin-top: 0.25rem; }
+
+      /* Capability Reference */
+      .cap-card { display: flex; flex-direction: column; gap: 0.7rem; }
+      .cap-group { display: flex; flex-direction: column; gap: 0.35rem; }
+      .cap-title {
+        display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.74rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.03em; color: var(--p-text-muted-color);
+      }
+      .cap-title i { color: var(--p-primary-color); font-size: 0.78rem; }
+      .cap-examples { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+      .cap-chip {
+        padding: 0.28rem 0.6rem; border-radius: 99px; border: 1px solid var(--p-content-border-color);
+        background: var(--p-content-background); color: var(--p-text-color); font-size: 0.74rem;
+        cursor: pointer; transition: border-color 0.15s, background 0.15s;
+      }
+      .cap-chip:hover { border-color: var(--p-primary-color); background: color-mix(in srgb, var(--p-primary-color) 8%, transparent); }
+
       /* Data Quality */
       .qual-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
       .qual-cat { font-weight: 700; color: #f59e0b; }
@@ -514,5 +612,20 @@ export class AiMessageComponent {
 
   askSuggestion(query: string): void {
     this.action.emit({ kind: 'ask-prompt', label: query, icon: 'pi pi-sparkles', prompt: query });
+  }
+
+  askVacanciesIn(deptName: string): void {
+    this.action.emit({
+      kind: 'ask-prompt',
+      label: `Vacancies in ${deptName}`,
+      icon: 'pi pi-inbox',
+      prompt: `Vacancies in ${deptName}`,
+    });
+  }
+
+  /** Bar length as a share of the largest group, floored so 1 stays visible. */
+  barWidth(count: number, total: number): number {
+    if (!total) return 0;
+    return Math.max(8, Math.round((count / total) * 100));
   }
 }

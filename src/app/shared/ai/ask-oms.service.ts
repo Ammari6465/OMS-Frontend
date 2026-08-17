@@ -41,40 +41,24 @@ export class AskOmsService {
 
   private seq = 0;
 
-  /** Dynamic role- and context-aware suggestions */
-  readonly suggestions = computed<AiSuggestion[]>(() => {
-    const ctx = this.sessionContext();
-    const dataCtx = this.buildContext();
+  /**
+   * Quick actions for the empty state only.
+   *
+   * Once a conversation starts, follow-ups are attached to each answer instead
+   * (see {@link generateFollowUpSuggestions}), so the panel never repeats the
+   * same global list under every message.
+   */
+  readonly suggestions = computed<AiSuggestion[]>(() => [
+    { label: 'Find employee', query: 'Find an employee', icon: 'pi pi-search' },
+    { label: 'Explore departments', query: 'Which department has the most employees?', icon: 'pi pi-building' },
+    { label: 'Open vacancies', query: 'Show open vacancies', icon: 'pi pi-inbox' },
+    { label: 'Reporting structure', query: 'Show department sizes', icon: 'pi pi-sitemap' },
+  ]);
 
-    if (ctx.staffName || ctx.departmentName) {
-      return generateFollowUpSuggestions(ctx.lastIntent ?? 'find-employee', ctx, dataCtx);
-    }
-
-    const base: AiSuggestion[] = [
-      { label: 'Guide me how to add a staff', query: 'Guide me how to add a staff', icon: 'pi pi-user-plus' },
-      { label: 'Which department has the most employees?', query: 'Which department has the most employees?', icon: 'pi pi-chart-bar' },
-      { label: 'Show open vacancies', query: 'Show open vacancies', icon: 'pi pi-inbox' },
-      { label: 'Who joined recently?', query: 'Who joined recently?', icon: 'pi pi-calendar' },
-      { label: 'Compare Finance and Operations', query: 'Compare Finance and Operations headcount', icon: 'pi pi-chart-bar' },
-    ];
-
-    // Seed a real employee name for quick demonstration
-    const sample = this.org.staff.snapshot()[0];
-    if (sample) {
-      const first = sample.name.trim().split(/\s+/)[0];
-      base.unshift({ label: `Find ${first}`, query: `Find ${sample.name}`, icon: 'pi pi-search' });
-    }
-
-    // Role-specific admin suggestions
-    if (this.auth.isAdmin()) {
-      base.push(
-        { label: 'Staff with no manager', query: 'Which employees have no manager?', icon: 'pi pi-exclamation-circle' },
-        { label: 'Departments with no head', query: 'Which departments have no head?', icon: 'pi pi-exclamation-triangle' },
-        { label: "Summarise today's activity", query: "Summarise today's activity", icon: 'pi pi-history' },
-      );
-    }
-
-    return base.slice(0, 6);
+  /** A live example for the hint under the input — uses a real department. */
+  readonly exampleHint = computed<string>(() => {
+    const dept = this.org.departments.snapshot()[0];
+    return dept ? `Try "Who manages ${dept.name}?"` : 'Try "Who manages Operations?"';
   });
 
   useBackendProvider(provider: AiProvider): void {
@@ -136,7 +120,14 @@ export class AskOmsService {
 
     result$
       .pipe(
-        switchMap((result) => this.provider.rephrase(result, q).pipe(map((text) => ({ result, text })))),
+        switchMap((result) =>
+          // Greetings, help screens and clarifications are UI copy, not
+          // data-derived prose — there is nothing for a provider to improve,
+          // and a round trip would only add latency.
+          result.skipRephrase
+            ? of({ result, text: result.answer })
+            : this.provider.rephrase(result, q).pipe(map((text) => ({ result, text }))),
+        ),
         catchError(() => {
           const fallback: AiResult = {
             intent: 'unknown',
