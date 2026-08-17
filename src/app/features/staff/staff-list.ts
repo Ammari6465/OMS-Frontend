@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, FormsModule, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
+import { Router } from '@angular/router';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { AvatarModule } from 'primeng/avatar';
 import { ButtonModule } from 'primeng/button';
@@ -147,6 +148,8 @@ const dateRangeValidator = (control: AbstractControl): ValidationErrors | null =
                   <button type="button" class="icon-action" pTooltip="View details" (click)="openDetails(member)"><i class="pi pi-eye"></i></button>
                   @if (!member.isDeleted && canManage()) {
                     <button type="button" class="icon-action" pTooltip="Edit" (click)="openEdit(member)"><i class="pi pi-pencil"></i></button>
+                    <button type="button" class="icon-action" pTooltip="Transfer or promote" (click)="startLifecycle(member, 'MOVER')"><i class="pi pi-arrow-right-arrow-left"></i></button>
+                    <button type="button" class="icon-action danger" pTooltip="Start employee exit" (click)="startLifecycle(member, 'LEAVER')"><i class="pi pi-sign-out"></i></button>
                     <button type="button" class="icon-action danger" pTooltip="Archive" (click)="confirmArchive(member)"><i class="pi pi-user-minus"></i></button>
                   } @else if (member.isDeleted && canManage()) {
                     <button type="button" class="icon-action" pTooltip="Restore" (click)="restore(member)"><i class="pi pi-refresh"></i></button>
@@ -399,6 +402,7 @@ export class StaffList {
   private readonly fb = inject(FormBuilder);
   private readonly confirm = inject(ConfirmationService);
   private readonly messages = inject(MessageService);
+  private readonly router = inject(Router);
   private readonly searchChanges = new Subject<string>();
 
   readonly rows = signal<Staff[]>([]);
@@ -426,6 +430,10 @@ export class StaffList {
   readonly detailsLoading = signal(false);
   readonly detailsVisible = signal(false);
   readonly canManage = this.auth.canEditOrgData;
+
+  startLifecycle(member: Staff, type: 'MOVER' | 'LEAVER'): void {
+    this.router.navigate(['/lifecycle'], { queryParams: { type, staffId: member.id } });
+  }
   private readonly selectedCompany = signal<number | null>(null);
   private readonly selectedDepartment = signal<number | null>(null);
 

@@ -43,6 +43,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Governance',
     items: [
+      { label: 'Employee Lifecycle', icon: 'pi pi-directions', route: '/lifecycle', roles: ADMINS, implemented: true },
       { label: 'Users & Roles', icon: 'pi pi-shield', route: '/users', roles: [Role.SUPER_ADMIN, Role.COMPANY_ADMIN], implemented: true },
       { label: 'Audit Log', icon: 'pi pi-history', route: '/audit', roles: ADMINS, implemented: true },
       { label: 'Notifications', icon: 'pi pi-bell', route: '/notifications', implemented: true },

@@ -80,6 +80,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/vacancy/vacancy-list').then((m) => m.VacancyList),
       },
       {
+        path: 'lifecycle',
+        canActivate: [roleGuard(ADMINS)],
+        data: { breadcrumb: 'Employee Lifecycle' },
+        loadComponent: () => import('./features/lifecycle/lifecycle-dashboard').then((m) => m.LifecycleDashboard),
+      },
+      {
         path: 'users',
         canActivate: [roleGuard(ADMINS)],
         data: { breadcrumb: 'Users & Roles', title: 'Users & Roles', icon: 'pi pi-shield' },

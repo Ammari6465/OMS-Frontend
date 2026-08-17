@@ -6,7 +6,7 @@ import { environment } from '../../../environments/environment';
 import { ApiResponse, PageResponse } from '../../core/models/api.model';
 import { Position } from '../../core/models/organization.model';
 
-export type PositionStatus = 'OPEN' | 'FILLED' | 'CLOSED';
+export type PositionStatus = 'OPEN' | 'FILLED' | 'ON_HOLD' | 'CLOSED';
 export type PositionSortField = 'title' | 'status' | 'createdAt' | 'updatedAt';
 
 export interface PositionQuery {

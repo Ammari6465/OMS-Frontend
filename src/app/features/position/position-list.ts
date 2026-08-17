@@ -264,8 +264,8 @@ export class PositionList implements OnInit {
   readonly staffOptions = computed(() => this.org.staff.snapshot().filter((s) => s.companyId === this.selectedCompany())
     .filter((s) => this.selectedDepartment() == null || s.deptId === this.selectedDepartment())
     .filter((s) => s.status === 'ACTIVE').map((s) => ({ label:`${s.name}${s.employeeCode ? ' · '+s.employeeCode : ''}`, value:s.id })));
-  readonly statusFilterOptions = [{label:'All statuses',value:null as PositionStatus|null},{label:'Open',value:'OPEN' as PositionStatus},{label:'Filled',value:'FILLED' as PositionStatus},{label:'Closed',value:'CLOSED' as PositionStatus}];
-  readonly editableStatusOptions = [{label:'Open',value:'OPEN' as PositionStatus},{label:'Closed',value:'CLOSED' as PositionStatus}];
+  readonly statusFilterOptions = [{label:'All statuses',value:null as PositionStatus|null},{label:'Open',value:'OPEN' as PositionStatus},{label:'Filled',value:'FILLED' as PositionStatus},{label:'On hold',value:'ON_HOLD' as PositionStatus},{label:'Closed',value:'CLOSED' as PositionStatus}];
+  readonly editableStatusOptions = [{label:'Open',value:'OPEN' as PositionStatus},{label:'On hold',value:'ON_HOLD' as PositionStatus},{label:'Closed',value:'CLOSED' as PositionStatus}];
   readonly assignmentFilterOptions = [{label:'Any staffing',value:null as boolean|null},{label:'Assigned',value:true},{label:'Unassigned',value:false}];
 
   readonly form = this.fb.nonNullable.group({
@@ -315,7 +315,7 @@ export class PositionList implements OnInit {
   invalid(name:string):boolean { const c=this.form.get(name);return !!c&&c.invalid&&(c.touched||c.dirty); }
   positionTitle(id?:number|null):string { return id==null?'Top level':this.org.positions.snapshot(true).find((p)=>p.id===id)?.title??'—'; }
   childPositions(id:number):Position[] { return this.org.positions.snapshot().filter((p)=>p.reportsToPositionId===id); }
-  statusLabel(status:PositionStatus):string { return status==='OPEN'?'Open / Vacant':status==='FILLED'?'Filled':'Closed'; }
+  statusLabel(status:PositionStatus):string { return status==='OPEN'?'Open / Vacant':status==='FILLED'?'Filled':status==='ON_HOLD'?'On hold':'Closed'; }
   statusSeverity(status:PositionStatus):'success'|'warn'|'secondary' { return status==='FILLED'?'success':status==='OPEN'?'warn':'secondary'; }
   formatDate(value?:string):string { return value?new Date(value).toLocaleDateString():'—'; }
   private persist(existing:Position|null):void { this.saving.set(true);const v=this.form.getRawValue();const payload:PositionCreateRequest={companyId:v.companyId!,title:v.title.trim(),deptId:v.deptId,reportsToPositionId:v.reportsToPositionId,staffId:v.staffId,status:v.status};
