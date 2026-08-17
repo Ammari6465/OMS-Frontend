@@ -103,6 +103,16 @@ describe('StaffList Component UI & Operations', () => {
     expect(component.rows()).toEqual([mockStaff]);
   });
 
+  it('[POSITIVE] applies the global-search query parameter to the staff request', async () => {
+    fixture.componentRef.setInput('q', 'Marcus');
+    fixture.detectChanges();
+
+    expect(component.search()).toBe('Marcus');
+    await vi.waitFor(() => {
+      expect(staffServiceMock.list).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'Marcus', page: 0 }));
+    });
+  });
+
   it('[POSITIVE] openCreate resets form and displays staff modal dialog', () => {
     component.openCreate();
 

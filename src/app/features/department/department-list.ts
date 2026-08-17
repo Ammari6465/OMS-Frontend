@@ -12,7 +12,7 @@ import { TextareaModule } from 'primeng/textarea';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
 import { TooltipModule } from 'primeng/tooltip';
 import { TableLazyLoadEvent } from 'primeng/types/table';
-import { finalize } from 'rxjs';
+import { catchError, finalize, map, of, switchMap } from 'rxjs';
 
 import { Option, OrgDataService } from '../../core/data/org-data.service';
 import { EntityStatus } from '../../core/models/enums';
@@ -284,7 +284,10 @@ export class DepartmentList {
     const operation = id
       ? this.departments.update(id, { ...payload, version: current?.version ?? 0 })
       : this.departments.create(payload);
-    operation.pipe(finalize(() => this.saving.set(false))).subscribe({
+    operation.pipe(
+      switchMap((saved) => this.org.departments.init().pipe(map(() => saved), catchError(() => of(saved)))),
+      finalize(() => this.saving.set(false)),
+    ).subscribe({
       next: () => {
         this.dialogVisible = false;
         this.load();
@@ -303,7 +306,9 @@ export class DepartmentList {
       acceptLabel: 'Archive',
       rejectLabel: 'Cancel',
       acceptButtonStyleClass: 'p-button-danger',
-      accept: () => this.departments.archive(department.id).subscribe({
+      accept: () => this.departments.archive(department.id).pipe(
+        switchMap(() => this.org.departments.init().pipe(catchError(() => of(void 0)))),
+      ).subscribe({
         next: () => {
           this.load();
           this.loadParentOptions(department.companyId);
@@ -315,7 +320,9 @@ export class DepartmentList {
   }
 
   restore(department: Department): void {
-    this.departments.restore(department.id).subscribe({
+    this.departments.restore(department.id).pipe(
+      switchMap((restored) => this.org.departments.init().pipe(map(() => restored), catchError(() => of(restored)))),
+    ).subscribe({
       next: () => {
         this.load();
         this.loadParentOptions(department.companyId);

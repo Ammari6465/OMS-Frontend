@@ -24,7 +24,7 @@ import { errorInterceptor } from './core/interceptors/error.interceptor';
 import { AuthService } from './core/services/auth.service';
 import { OrgDataService } from './core/data/org-data.service';
 import { NotificationService } from './core/data/notification.service';
-import { catchError, of, tap } from 'rxjs';
+import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -79,12 +79,12 @@ export const appConfig: ApplicationConfig = {
       const org = inject(OrgDataService);
       const notifications = inject(NotificationService);
       return auth.init().pipe(
-        tap(() => {
-          if (auth.isAuthenticated()) {
-            org.init().subscribe({ error: () => {} });
-            notifications.init().subscribe({ error: () => {} });
-          }
-        }),
+        switchMap(() => auth.isAuthenticated()
+          ? forkJoin([
+              org.init().pipe(catchError(() => of(void 0))),
+              notifications.init().pipe(catchError(() => of(void 0))),
+            ]).pipe(map(() => void 0))
+          : of(void 0)),
         catchError(() => of(void 0)),
       );
     }),

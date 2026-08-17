@@ -42,6 +42,7 @@ describe('DepartmentList Component UI & Operations', () => {
     };
 
     orgDataMock = {
+      departments: { init: vi.fn().mockReturnValue(of(undefined)) },
       companyOptions: signal([{ label: 'Sunrich Group', value: 1 }]),
       companyName: vi.fn().mockReturnValue('Sunrich Group'),
       departmentName: vi.fn().mockReturnValue('—'),
@@ -124,6 +125,7 @@ describe('DepartmentList Component UI & Operations', () => {
       detail: 'Technology',
     });
     expect(component.dialogVisible).toBe(false);
+    expect(orgDataMock.departments.init).toHaveBeenCalled();
   });
 
   it('[POSITIVE] openEdit populates form with existing department details and version', () => {

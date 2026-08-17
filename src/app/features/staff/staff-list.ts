@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, FormsModule, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
 import { ConfirmationService, MessageService } from 'primeng/api';
@@ -390,6 +390,9 @@ const dateRangeValidator = (control: AbstractControl): ValidationErrors | null =
   `],
 })
 export class StaffList {
+  /** Bound from the `q` route query parameter by withComponentInputBinding. */
+  readonly q = input('');
+  private lastRouteQuery = '';
   readonly org = inject(OrgDataService);
   private readonly auth = inject(AuthService);
   private readonly staffApi = inject(StaffService);
@@ -511,6 +514,13 @@ export class StaffList {
       distinctUntilChanged(),
       takeUntilDestroyed(),
     ).subscribe(() => this.resetAndLoad());
+
+    effect(() => {
+      const routeQuery = this.q().trim();
+      if (routeQuery === this.lastRouteQuery) return;
+      this.lastRouteQuery = routeQuery;
+      this.applySearch(routeQuery);
+    });
 
     this.form.get('companyId')!.valueChanges.pipe(takeUntilDestroyed()).subscribe((companyId) => {
       this.selectedCompany.set(companyId);

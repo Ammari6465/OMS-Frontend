@@ -1,4 +1,5 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { signal } from '@angular/core';
 import { Observable, map, of, tap } from 'rxjs';
 
 import { Audited } from '../models/organization.model';
@@ -21,7 +22,7 @@ export type ChangeAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'RESTORE';
  * source of truth; no organisational records are written to browser storage.
  */
 export class LocalStore<T extends Audited> {
-  private items: T[] = [];
+  private readonly items = signal<T[]>([]);
   private loaded = false;
 
   constructor(
@@ -40,23 +41,23 @@ export class LocalStore<T extends Audited> {
     return this.http.get<ApiResponse<T[]>>(this.endpoint, { params }).pipe(
       map((response) => response.data ?? []),
       tap((items) => {
-        this.items = items;
+        this.items.set(items);
         this.loaded = true;
       }),
     );
   }
 
   list(query: ListQuery = {}): Observable<PageResponse<T>> {
-    const source = this.loaded ? of(this.items) : this.fetchAll();
+    const source = this.loaded ? of(this.items()) : this.fetchAll();
     return source.pipe(map((items) => this.toPage(items, query)));
   }
 
   snapshot(includeDeleted = false): T[] {
-    return this.items.filter((item) => includeDeleted || !item.isDeleted);
+    return this.items().filter((item) => includeDeleted || !item.isDeleted);
   }
 
   get(id: number): Observable<T | undefined> {
-    const source = this.loaded ? of(this.items) : this.fetchAll();
+    const source = this.loaded ? of(this.items()) : this.fetchAll();
     return source.pipe(map((items) => items.find((item) => item.id === id)));
   }
 
@@ -64,7 +65,7 @@ export class LocalStore<T extends Audited> {
     return this.http.post<ApiResponse<T>>(this.endpoint, dto).pipe(
       map((response) => response.data),
       tap((item) => {
-        this.items = [...this.items, item];
+        this.items.update((items) => [...items, item]);
         this.onChange?.('CREATE', item);
       }),
     );
@@ -74,7 +75,7 @@ export class LocalStore<T extends Audited> {
     return this.http.put<ApiResponse<T>>(`${this.endpoint}/${id}`, dto).pipe(
       map((response) => response.data),
       tap((item) => {
-        this.items = this.items.map((current) => (current.id === id ? item : current));
+        this.items.update((items) => items.map((current) => (current.id === id ? item : current)));
         this.onChange?.('UPDATE', item);
       }),
     );
@@ -83,10 +84,11 @@ export class LocalStore<T extends Audited> {
   softDelete(id: number): Observable<void> {
     return this.http.delete<ApiResponse<void>>(`${this.endpoint}/${id}`).pipe(
       tap(() => {
-        const item = this.items.find((current) => current.id === id);
+        const item = this.items().find((current) => current.id === id);
         if (item) {
-          item.isDeleted = true;
-          this.onChange?.('DELETE', item);
+          const archived = { ...item, isDeleted: true } as T;
+          this.items.update((items) => items.map((current) => current.id === id ? archived : current));
+          this.onChange?.('DELETE', archived);
         }
       }),
       map(() => void 0),
@@ -97,7 +99,7 @@ export class LocalStore<T extends Audited> {
     return this.http.patch<ApiResponse<T>>(`${this.endpoint}/${id}/restore`, {}).pipe(
       map((response) => response.data),
       tap((item) => {
-        this.items = this.items.map((current) => (current.id === id ? item : current));
+        this.items.update((items) => items.map((current) => (current.id === id ? item : current)));
         this.onChange?.('RESTORE', item);
       }),
     );
