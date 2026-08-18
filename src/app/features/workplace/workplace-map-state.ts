@@ -1,0 +1,3 @@
+import { Desk } from './workplace.service';
+export function clampDeskGeometry(desk:Desk):Desk{return{...desk,x:Math.max(0,Math.min(100-desk.width,desk.x)),y:Math.max(0,Math.min(100-desk.height,desk.y)),width:Math.max(.01,Math.min(100-desk.x,desk.width)),height:Math.max(.01,Math.min(100-desk.y,desk.height)),rotation:((desk.rotation%360)+360)%360}}
+export function clientToMap(clientX:number,clientY:number,bounds:{left:number;top:number;width:number;height:number},zoom=1,panX=0,panY=0){return{x:((clientX-bounds.left)*100/bounds.width-panX)/zoom,y:((clientY-bounds.top)*100/bounds.height-panY)/zoom}}

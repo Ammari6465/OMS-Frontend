@@ -31,6 +31,7 @@ export type AiIntentKind =
   | 'find-employee'
   | 'insights'
   | 'activity-summary'
+  | 'workplace-location'
   | 'my-profile'
   | 'my-manager'
   | 'my-team'
@@ -57,12 +58,13 @@ export interface AiAction {
   deptId?: number;
   companyId?: number;
   prompt?: string;
+  deskId?: number;
 }
 
 /** Conversational context persisted within an Ask OMS session. */
 export interface AskOmsContext {
   lastIntent?: AiIntentKind;
-  lastEntityType?: 'staff' | 'department' | 'company' | 'position' | 'vacancy';
+  lastEntityType?: 'staff' | 'department' | 'company' | 'position' | 'vacancy' | 'desk';
   staffId?: number | null;
   staffName?: string | null;
   departmentId?: number | null;

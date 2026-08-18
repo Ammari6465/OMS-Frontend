@@ -11,8 +11,10 @@ import { AiAction, AiMessage, AiResult, AiSuggestion, AskOmsContext } from './ai
 import { AiDataContext, generateFollowUpSuggestions, interpret } from './intent-engine';
 import { AiProvider, LocalTemplateProvider } from './ai-provider';
 import { OrganogramFocusService } from './organogram-focus.service';
+import { WorkplaceService } from '../../features/workplace/workplace.service';
 
 const ACTIVITY_RE = /\b(activit(y|ies)|what happened|what.s new|today.s (summary|updates?)|summar(y|ise|ize) (today|the day|activity)|notification summary)\b/i;
+const WORKPLACE_RE = /\b(sit|sitting|seated|desk|floor|workplace|available desks?|assigned desks?|zone)\b/i;
 
 /**
  * Orchestrates the Ask OMS organizational copilot:
@@ -30,6 +32,7 @@ export class AskOmsService {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly organogramFocus = inject(OrganogramFocusService);
+  private readonly workplaces = inject(WorkplaceService);
 
   /** Swappable formatter. Defaults to the deterministic local provider. */
   private provider: AiProvider = new LocalTemplateProvider();
@@ -114,9 +117,9 @@ export class AskOmsService {
 
     const dataContext = this.buildContext();
 
-    const result$: Observable<AiResult> = ACTIVITY_RE.test(q)
-      ? this.activitySummary()
-      : of(interpret(q, dataContext));
+    const result$: Observable<AiResult> = WORKPLACE_RE.test(q)
+      ? this.workplaceAnswer(q)
+      : ACTIVITY_RE.test(q) ? this.activitySummary() : of(interpret(q, dataContext));
 
     result$
       .pipe(
@@ -193,12 +196,19 @@ export class AskOmsService {
       if (action.deptId != null) queryParams['deptId'] = action.deptId;
       if (action.companyId != null) queryParams['companyId'] = action.companyId;
       if (action.staffId != null) queryParams['staffId'] = action.staffId;
+      if (action.deskId != null) queryParams['deskId'] = action.deskId;
       void this.router.navigate([action.route], { queryParams });
       if (window.matchMedia('(max-width: 720px)').matches) this.close();
     }
   }
 
   // ---- context + async tools ----
+
+  private workplaceAnswer(query:string):Observable<AiResult>{
+    const q=query.toLowerCase();const people=this.org.staff.snapshot();const person=people.find(s=>q.includes(s.name.toLowerCase()))??people.find(s=>s.name.toLowerCase().split(/\s+/).some(n=>n.length>2&&q.includes(n)));
+    if(person&&/\b(where|sit|seated|desk|floor|workplace)\b/i.test(query))return this.workplaces.current(person.id).pipe(map(location=>location?{intent:'workplace-location' as const,context:{staffId:person.id,desk:location.deskCode,floor:location.floorName,office:location.officeName},answer:`${person.name} is assigned to desk ${location.deskCode} in ${location.zoneName||'an unzoned area'}, ${location.floorName}, ${location.buildingName}, ${location.officeName}.${location.telephoneExtension?` Extension ${location.telephoneExtension}.`:''}`,actions:[{kind:'navigate' as const,label:'View on floor map',icon:'pi pi-map-marker',route:`/workplaces/floors/${location.floorId}/map`,deskId:location.deskId},{kind:'navigate' as const,label:'Open staff record',icon:'pi pi-user',route:'/staff',staffId:person.id}],tone:'normal' as const}:{intent:'workplace-location' as const,context:{staffId:person.id},answer:`${person.name} does not have an active desk assignment.`,actions:[{kind:'navigate' as const,label:'Open Workplaces',icon:'pi pi-map',route:'/workplaces'}],tone:'empty' as const}));
+    return this.workplaces.desks().pipe(map(desks=>{const desk=desks.find(d=>q.includes(d.code.toLowerCase()));if(desk)return{intent:'workplace-location' as const,context:{desk:desk.code},answer:desk.assignment?`Desk ${desk.code} is assigned to ${desk.assignment.staffName||'a staff member'}${desk.zoneName?` in ${desk.zoneName}`:''}.`:`Desk ${desk.code} is ${desk.availability.toLowerCase()}${desk.zoneName?` in ${desk.zoneName}`:''}.`,actions:[{kind:'navigate' as const,label:'Open desk on map',icon:'pi pi-map-marker',route:`/workplaces/floors/${desk.floorId}/map`,deskId:desk.id}],tone:'normal' as const};const zone=desks.find(d=>d.zoneName&&q.includes(d.zoneName.toLowerCase()))?.zoneName;if(zone){const occupants=desks.filter(d=>d.zoneName===zone&&d.assignment?.staffName);return{intent:'workplace-location' as const,context:{zone,count:occupants.length},answer:occupants.length?`${occupants.length} people sit in ${zone}:\n${occupants.map(d=>`• ${d.assignment!.staffName} — ${d.code}`).join('\n')}`:`No active permanent assignments were found in ${zone}.`,actions:[{kind:'navigate' as const,label:'Open Workplaces',icon:'pi pi-map',route:'/workplaces'}],tone:(occupants.length?'normal':'empty') as 'normal'|'empty'}}if(/without.*desk/i.test(q)){const assigned=new Set(desks.flatMap(d=>d.assignment?[d.assignment.staffId]:[]));const missing=people.filter(s=>s.status==='ACTIVE'&&!assigned.has(s.id));return{intent:'workplace-location' as const,context:{count:missing.length},answer:missing.length?`${missing.length} active staff do not have a primary desk assignment:\n${missing.slice(0,15).map(s=>`• ${s.name}`).join('\n')}`:'All active staff have a desk assignment.',actions:[{kind:'navigate' as const,label:'Open Workplaces',icon:'pi pi-map',route:'/workplaces'}],tone:(missing.length?'normal':'empty') as 'normal'|'empty'}}const available=desks.filter(d=>d.availability==='AVAILABLE'&&d.status==='ACTIVE');return{intent:'workplace-location' as const,context:{available:available.length},answer:available.length?`${available.length} desks are currently available for permanent assignment. ${available.slice(0,10).map(d=>d.code).join(', ')}.`:'No available desks were found.',actions:[{kind:'navigate' as const,label:'Show available desks',icon:'pi pi-map',route:'/workplaces'}],tone:(available.length?'normal':'empty') as 'normal'|'empty'}}));
+  }
 
   private buildContext(): AiDataContext {
     return {
