@@ -538,6 +538,16 @@ input[type="email"]:focus {
 [data-oms-theme='glass-minimal'] .p-card,[data-oms-theme='glass-minimal'] .oms-surface-card,[data-oms-theme='glass-minimal'] .p-dialog{backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
 [data-oms-theme='avant-garde'] :where(.p-card,.oms-surface-card,.p-dialog,.p-inputtext){border-style:dashed!important}
 
+.p-select-option {
+  /* PrimeNG overlays are appended outside the component tree. Explicitly
+     inherit the OMS theme foreground so idle options remain readable on the
+     dark glass surface instead of falling back to the library's dark text. */
+  color: var(--p-text-color) !important;
+}
+.p-select-option.p-disabled {
+  color: var(--p-text-muted-color) !important;
+  opacity: 0.65;
+}
 .p-select-option:hover,
 .p-select-option.p-select-option-selected,
 .p-menu-item-link:hover {
