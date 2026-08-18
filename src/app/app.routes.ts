@@ -92,6 +92,18 @@ export const routes: Routes = [
         loadComponent: () => import('./features/workplace/workplace-map').then((m) => m.WorkplaceMap),
       },
       {
+        path: 'workplaces/offices',
+        canActivate: [roleGuard(ADMINS)],
+        data: { breadcrumb: 'Workplace Administration', tab: 'offices' },
+        loadComponent: () => import('./features/workplace/workplace-admin').then((m) => m.WorkplaceAdmin),
+      },
+      {
+        path: 'workplaces/desks',
+        canActivate: [roleGuard(ADMINS)],
+        data: { breadcrumb: 'Desks', tab: 'desks' },
+        loadComponent: () => import('./features/workplace/workplace-admin').then((m) => m.WorkplaceAdmin),
+      },
+      {
         path: 'workplaces/floors/:floorId/map',
         data: { breadcrumb: 'Floor Map' },
         canDeactivate: [unsavedWorkplaceGuard],
