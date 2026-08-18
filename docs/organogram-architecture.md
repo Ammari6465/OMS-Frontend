@@ -20,3 +20,10 @@ The chart fetches one minimal company-scoped payload and never receives contact 
 ## Exports
 
 PNG export renders the current sanitized DOM through an SVG foreign object into a canvas. CSV exports the complete loaded hierarchy with quoted fields. PDF is provided through the browser's print/PDF pipeline and never uses `document.write`.
+
+## Verified responsive captures
+
+- [Desktop after](screenshots/organogram-after-desktop.png) (1440 × 900)
+- [Mobile after](screenshots/organogram-after-mobile.png) (390 × 844)
+
+No reproducible baseline screenshot was stored before the refactor, so the repository contains verified after-captures only rather than presenting a reconstructed image as evidence.

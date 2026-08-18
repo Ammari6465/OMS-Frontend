@@ -1,5 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { DestroyRef, Injectable, OnDestroy, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MessageService } from 'primeng/api';
 import { debounceTime, filter, finalize, Subject } from 'rxjs';
@@ -10,14 +11,16 @@ import { OrganogramNode, OrganogramResponse, OrganogramView } from './organogram
 import { OrganogramRealtimeService } from './organogram-realtime.service';
 
 @Injectable()
-export class OrganogramStore {
+export class OrganogramStore implements OnDestroy {
   private readonly api = inject(OrganogramApiService);
   private readonly org = inject(OrgDataService);
   private readonly realtime = inject(OrganogramRealtimeService);
   private readonly messages = inject(MessageService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly reloads = new Subject<void>();
+  private connectedCompanyId: number | null = null;
   readonly data = signal<OrganogramResponse | null>(null);
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
@@ -74,11 +77,14 @@ export class OrganogramStore {
     if (mode === 'POSITION') this.view.set('POSITION');
     if (Number.isFinite(selected) && selected > 0) this.selectedId.set(selected);
     if (Number.isFinite(dept) && dept > 0) this.departmentId.set(dept);
-    this.reloads.pipe(debounceTime(180)).subscribe(() => this.load(true));
+    this.reloads
+      .pipe(debounceTime(180), takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.load(true));
     this.realtime.events
       .pipe(
         filter((e) => e.companyId === this.companyId()),
         debounceTime(250),
+        takeUntilDestroyed(this.destroyRef),
       )
       .subscribe(() => {
         this.messages.add({
@@ -88,7 +94,9 @@ export class OrganogramStore {
         });
         this.load(true);
       });
-    this.realtime.connection.subscribe((s) => this.disconnected.set(s === 'disconnected'));
+    this.realtime.connection
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((s) => this.disconnected.set(s === 'disconnected'));
     if (this.companyId() != null) this.load();
   }
   load(preserveView = false) {
@@ -104,7 +112,10 @@ export class OrganogramStore {
           this.data.set(data);
           this.conflict.set(false);
           if (!preserveView) this.fit();
-          this.realtime.connect(company);
+          if (this.connectedCompanyId !== company) {
+            this.realtime.connect(company);
+            this.connectedCompanyId = company;
+          }
           this.syncQuery();
         },
         error: () =>
@@ -231,6 +242,11 @@ export class OrganogramStore {
   }
   companyForStaff(staffId: number) {
     return this.org.staff.snapshot().find((x) => x.id === staffId)?.companyId ?? null;
+  }
+  ngOnDestroy(): void {
+    this.realtime.disconnect();
+    this.connectedCompanyId = null;
+    this.reloads.complete();
   }
   private syncQuery() {
     void this.router.navigate([], {

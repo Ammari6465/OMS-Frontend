@@ -54,7 +54,15 @@ export class OrganogramRealtimeService {
               .join('');
             if (!data) continue;
             const event = JSON.parse(data) as OrganogramEvent;
-            if (event.companyId !== companyId) continue;
+            if (
+              event.companyId !== companyId ||
+              !event.entityType ||
+              !event.action ||
+              !Number.isFinite(event.entityId) ||
+              !Number.isFinite(event.version) ||
+              !event.timestamp
+            )
+              continue;
             const key = `${event.entityType}:${event.entityId}:${event.version}`;
             if (seen.has(key)) continue;
             seen.add(key);
