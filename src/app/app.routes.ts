@@ -81,12 +81,6 @@ export const routes: Routes = [
         loadComponent: () => import('./features/vacancy/vacancy-list').then((m) => m.VacancyList),
       },
       {
-        path: 'lifecycle',
-        canActivate: [roleGuard(ADMINS)],
-        data: { breadcrumb: 'Employee Lifecycle' },
-        loadComponent: () => import('./features/lifecycle/lifecycle-dashboard').then((m) => m.LifecycleDashboard),
-      },
-      {
         path: 'workplaces',
         data: { breadcrumb: 'Workplaces' },
         loadComponent: () => import('./features/workplace/workplace-map').then((m) => m.WorkplaceMap),

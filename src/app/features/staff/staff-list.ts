@@ -149,8 +149,6 @@ const dateRangeValidator = (control: AbstractControl): ValidationErrors | null =
                   <button type="button" class="icon-action" pTooltip="View details" (click)="openDetails(member)"><i class="pi pi-eye"></i></button>
                   @if (!member.isDeleted && canManage()) {
                     <button type="button" class="icon-action" pTooltip="Edit" (click)="openEdit(member)"><i class="pi pi-pencil"></i></button>
-                    <button type="button" class="icon-action" pTooltip="Transfer or promote" (click)="startLifecycle(member, 'MOVER')"><i class="pi pi-arrow-right-arrow-left"></i></button>
-                    <button type="button" class="icon-action danger" pTooltip="Start employee exit" (click)="startLifecycle(member, 'LEAVER')"><i class="pi pi-sign-out"></i></button>
                     <button type="button" class="icon-action danger" pTooltip="Archive" (click)="confirmArchive(member)"><i class="pi pi-user-minus"></i></button>
                   } @else if (member.isDeleted && canManage()) {
                     <button type="button" class="icon-action" pTooltip="Restore" (click)="restore(member)"><i class="pi pi-refresh"></i></button>
@@ -440,9 +438,6 @@ export class StaffList {
   readonly detailsVisible = signal(false);
   readonly canManage = this.auth.canEditOrgData;
 
-  startLifecycle(member: Staff, type: 'MOVER' | 'LEAVER'): void {
-    this.router.navigate(['/lifecycle'], { queryParams: { type, staffId: member.id } });
-  }
   private readonly selectedCompany = signal<number | null>(null);
   private readonly selectedDepartment = signal<number | null>(null);
 
