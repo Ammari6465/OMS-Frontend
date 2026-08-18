@@ -3,6 +3,7 @@ import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/guards/auth.guard';
 import { roleGuard } from './core/guards/role.guard';
 import { Role } from './core/models/enums';
+import { unsavedWorkplaceGuard } from './features/workplace/unsaved-workplace.guard';
 
 const ADMINS = [Role.SUPER_ADMIN, Role.COMPANY_ADMIN];
 
@@ -84,6 +85,17 @@ export const routes: Routes = [
         canActivate: [roleGuard(ADMINS)],
         data: { breadcrumb: 'Employee Lifecycle' },
         loadComponent: () => import('./features/lifecycle/lifecycle-dashboard').then((m) => m.LifecycleDashboard),
+      },
+      {
+        path: 'workplaces',
+        data: { breadcrumb: 'Workplaces' },
+        loadComponent: () => import('./features/workplace/workplace-map').then((m) => m.WorkplaceMap),
+      },
+      {
+        path: 'workplaces/floors/:floorId/map',
+        data: { breadcrumb: 'Floor Map' },
+        canDeactivate: [unsavedWorkplaceGuard],
+        loadComponent: () => import('./features/workplace/workplace-map').then((m) => m.WorkplaceMap),
       },
       {
         path: 'users',

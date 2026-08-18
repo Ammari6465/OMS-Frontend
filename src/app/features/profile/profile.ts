@@ -13,6 +13,7 @@ import { OrgDataService } from '../../core/data/org-data.service';
 import { ChangePasswordError } from '../../core/models/auth.model';
 import { ROLE_LABELS } from '../../core/models/enums';
 import { AuthService } from '../../core/services/auth.service';
+import { Assignment, WorkplaceService } from '../workplace/workplace.service';
 
 interface ProfileDetail {
   icon: string;
@@ -142,6 +143,11 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
                 </div>
               }
             </dl>
+          </section>
+
+          <section class="profile-card" aria-labelledby="workplace-title">
+            <div class="card-heading"><span class="card-icon"><i class="pi pi-map-marker"></i></span><div><h2 id="workplace-title">My Workplace</h2><p>Your assigned office seating</p></div></div>
+            @if(workplace();as location){<dl class="detail-list"><div class="detail-row"><dt><i class="pi pi-building"></i>Office</dt><dd>{{location.officeName}}</dd></div><div class="detail-row"><dt><i class="pi pi-map"></i>Building / Floor</dt><dd>{{location.buildingName}} · {{location.floorName}}</dd></div><div class="detail-row"><dt><i class="pi pi-th-large"></i>Zone / Desk</dt><dd>{{location.zoneName||'Unzoned'}} · {{location.deskCode}}</dd></div><div class="detail-row"><dt><i class="pi pi-phone"></i>Extension</dt><dd>{{location.telephoneExtension||'Not assigned'}}</dd></div><div class="detail-row"><dt><i class="pi pi-calendar"></i>Effective from</dt><dd>{{location.effectiveFrom}}</dd></div></dl><p-button label="View on floor map" icon="pi pi-map-marker" [outlined]="true" (onClick)="viewWorkplace(location)"/>}@else{<div class="empty-assignment"><i class="pi pi-desktop"></i><strong>No desk assigned</strong><span>Your workplace will appear here after an administrator assigns a desk.</span></div>}
           </section>
 
           <section class="profile-card relationship-card" aria-labelledby="relationship-title">
@@ -349,12 +355,14 @@ export class Profile {
   private readonly auth = inject(AuthService);
   private readonly messages = inject(MessageService);
   private readonly org = inject(OrgDataService);
+  private readonly workplaceApi = inject(WorkplaceService);
   private readonly router = inject(Router, { optional: true });
 
   readonly user = this.auth.currentUser;
   readonly editSaving = signal(false);
   readonly passwordSaving = signal(false);
   readonly passwordError = signal('');
+  readonly workplace = signal<Assignment | null>(null);
   readonly newPassword = signal('');
 
   editVisible = false;
@@ -477,7 +485,10 @@ export class Profile {
     this.passwordForm.controls.newPassword.valueChanges
       .pipe(takeUntilDestroyed())
       .subscribe((value) => this.newPassword.set(value));
+    const staffId=this.user()?.staffId;if(staffId!=null)this.workplaceApi.current(staffId).subscribe({next:value=>this.workplace.set(value),error:()=>this.workplace.set(null)});
   }
+
+  viewWorkplace(location:Assignment):void{void this.router?.navigate(['/workplaces/floors',location.floorId,'map'],{queryParams:{deskId:location.deskId}})}
 
   openEditProfile(): void {
     const user = this.user();

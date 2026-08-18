@@ -6,10 +6,12 @@ import { ButtonModule } from 'primeng/button';
 import { TagModule } from 'primeng/tag';
 import { TooltipModule } from 'primeng/tooltip';
 import { MessageService } from 'primeng/api';
+import { Router } from '@angular/router';
 
 import { OrgDataService } from '../../core/data/org-data.service';
 import { Position, Staff } from '../../core/models/organization.model';
 import { OrganogramFocusService } from '../../shared/ai/organogram-focus.service';
+import { Assignment, WorkplaceService } from '../workplace/workplace.service';
 
 interface OrgNode {
   staff: Staff;
@@ -164,6 +166,7 @@ interface OrgNode {
           }
           <div class="d-row"><span>Joined</span><strong>{{ s.dateJoined || '—' }}</strong></div>
           @if (s.dateLeft) { <div class="d-row"><span>Left</span><strong>{{ s.dateLeft }}</strong></div> }
+          @if(workplace();as location){<div class="d-row"><span>Workplace</span><strong>{{location.officeName}} · {{location.floorName}}</strong></div><div class="d-row"><span>Desk</span><strong>{{location.deskCode}} · {{location.zoneName||'Unzoned'}}</strong></div><p-button label="View on floor map" icon="pi pi-map-marker" [outlined]="true" (onClick)="viewWorkplace(location)"/>}
           <div class="d-chain">
             <div class="d-chain-title">Reporting line</div>
             @for (r of reportingChain(s); track r.id; let last = $last) {
@@ -331,6 +334,8 @@ export class OrganogramViewer implements OnInit {
   readonly org = inject(OrgDataService);
   private readonly messages = inject(MessageService);
   private readonly focusBus = inject(OrganogramFocusService);
+  private readonly workplaceApi = inject(WorkplaceService);
+  private readonly router = inject(Router);
 
   constructor() {
     // Honour focus requests from the Ask OMS copilot ("Find John") by reusing
@@ -349,6 +354,7 @@ export class OrganogramViewer implements OnInit {
   readonly zoom = signal(1);
   readonly hoveredId = signal<number|null>(null);
   readonly selected = signal<Staff | null>(null);
+  readonly workplace = signal<Assignment|null>(null);
   readonly draggedNode = signal<OrgNode | null>(null);
   private readonly collapsed = signal<Set<number>>(new Set());
   private readonly refresh = signal(0);
@@ -421,6 +427,7 @@ export class OrganogramViewer implements OnInit {
     this.term.set(person.name);
     this.hoveredId.set(person.id);
     this.selected.set(person);
+    this.loadWorkplace(person.id);
     this.zoom.set(1.1);
     this.pan.set({ x: 0, y: 0 });
     queueMicrotask(() => {
@@ -489,7 +496,11 @@ export class OrganogramViewer implements OnInit {
 
   select(staff: Staff): void {
     this.selected.set(staff);
+    this.loadWorkplace(staff.id);
   }
+
+  private loadWorkplace(staffId:number):void{this.workplace.set(null);this.workplaceApi.current(staffId).subscribe({next:x=>this.workplace.set(x),error:()=>this.workplace.set(null)})}
+  viewWorkplace(location:Assignment):void{this.selected.set(null);void this.router.navigate(['/workplaces/floors',location.floorId,'map'],{queryParams:{deskId:location.deskId}})}
 
   reportingChain(s: Staff): Staff[] {
     const all = this.org.staff.snapshot();

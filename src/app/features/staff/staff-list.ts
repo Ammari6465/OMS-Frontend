@@ -23,6 +23,7 @@ import { EmploymentType, EntityStatus } from '../../core/models/enums';
 import { Staff } from '../../core/models/organization.model';
 import { AuthService } from '../../core/services/auth.service';
 import { StaffCreateRequest, StaffService, StaffSortField } from './staff.service';
+import { Assignment, WorkplaceService } from '../workplace/workplace.service';
 
 const dateRangeValidator = (control: AbstractControl): ValidationErrors | null => {
   const joined = control.get('dateJoined')?.value as string | null;
@@ -291,6 +292,11 @@ const dateRangeValidator = (control: AbstractControl): ValidationErrors | null =
             <div><span>Manager</span><strong>{{ member.managerName || org.staffName(member.managerId) }}</strong></div>
             <div><span>Employment type</span><strong>{{ employmentTypeLabel(member.empType) }}</strong></div>
             <div><span>Date joined</span><strong>{{ member.dateJoined || 'Not provided' }}</strong></div>
+            @if(workplaceAssignment();as location){
+              <div><span>Office</span><strong>{{location.officeName}}</strong></div><div><span>Building</span><strong>{{location.buildingName}}</strong></div>
+              <div><span>Floor / Zone</span><strong>{{location.floorName}} · {{location.zoneName||'Unzoned'}}</strong></div><div><span>Desk / Extension</span><strong>{{location.deskCode}} · {{location.telephoneExtension||'No extension'}}</strong></div>
+              <div><span>Assigned from</span><strong>{{location.effectiveFrom}}</strong></div>
+            }
           </div>
           <div class="org-path" aria-label="Organizational reporting path">
             <span>{{ member.companyName || org.companyName(member.companyId) }}</span><i class="pi pi-arrow-right"></i>
@@ -299,6 +305,7 @@ const dateRangeValidator = (control: AbstractControl): ValidationErrors | null =
             <span>{{ member.managerName || org.staffName(member.managerId) }}</span><i class="pi pi-arrow-right"></i>
             <strong>{{ member.name }}</strong>
           </div>
+          <div class="header-actions">@if(workplaceAssignment();as location){<p-button label="View on floor map" icon="pi pi-map-marker" [outlined]="true" (onClick)="viewWorkplace(location)"/>}@if(canManage()){<p-button label="Assign workplace" icon="pi pi-desktop" (onClick)="startWorkplaceAssignment(member)"/>}</div>
         } @else if (detailsLoading()) {
           <div class="empty-state"><i class="pi pi-spin pi-spinner"></i><p>Loading staff details…</p></div>
         }
@@ -399,6 +406,7 @@ export class StaffList {
   readonly org = inject(OrgDataService);
   private readonly auth = inject(AuthService);
   private readonly staffApi = inject(StaffService);
+  private readonly workplaceApi = inject(WorkplaceService);
   private readonly fb = inject(FormBuilder);
   private readonly confirm = inject(ConfirmationService);
   private readonly messages = inject(MessageService);
@@ -427,6 +435,7 @@ export class StaffList {
   readonly showArchived = signal(false);
   readonly editingId = signal<number | null>(null);
   readonly selectedDetails = signal<Staff | null>(null);
+  readonly workplaceAssignment = signal<Assignment | null>(null);
   readonly detailsLoading = signal(false);
   readonly detailsVisible = signal(false);
   readonly canManage = this.auth.canEditOrgData;
@@ -694,13 +703,17 @@ export class StaffList {
 
   openDetails(member: Staff): void {
     this.selectedDetails.set(null);
+    this.workplaceAssignment.set(null);
     this.detailsLoading.set(true);
     this.detailsVisible.set(true);
-    this.staffApi.get(member.id).pipe(finalize(() => this.detailsLoading.set(false))).subscribe({
-      next: (details) => this.selectedDetails.set(details),
+    forkJoin({details:this.staffApi.get(member.id),workplace:this.workplaceApi.current(member.id).pipe(catchError(()=>of(null)))}).pipe(finalize(() => this.detailsLoading.set(false))).subscribe({
+      next: ({details,workplace}) => {this.selectedDetails.set(details);this.workplaceAssignment.set(workplace)},
       error: () => this.messages.add({ severity: 'error', summary: 'Could not load staff details', detail: 'Please try again.' }),
     });
   }
+
+  viewWorkplace(location: Assignment): void { this.detailsVisible.set(false); this.router.navigate(['/workplaces/floors',location.floorId,'map'],{queryParams:{deskId:location.deskId}}); }
+  startWorkplaceAssignment(member: Staff): void { this.detailsVisible.set(false); this.router.navigate(['/workplaces'],{queryParams:{assignStaffId:member.id}}); }
 
   save(): void {
     if (this.form.invalid) {

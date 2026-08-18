@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { SelectModule } from 'primeng/select';
@@ -10,6 +10,7 @@ import { DashboardService } from './dashboard.service';
 import { KpiCard } from './components/kpi-card';
 import { CountUp } from '../../shared/count-up.directive';
 import { AskOmsService } from '../../shared/ai/ask-oms.service';
+import { WorkplaceService, WorkplaceSummary } from '../workplace/workplace.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -97,6 +98,7 @@ import { AskOmsService } from '../../shared/ai/ask-oms.service';
             }
           }
         </div>
+        @if(auth.canEditOrgData()&&workplace();as seats){<section class="dash-card workplace-kpis mt-2"><div class="card-head"><div><h3>Workplace Seating</h3><p>Permanent assignment utilization—not physical presence</p></div><button type="button" class="link" (click)="go('/workplaces')">Open maps <i class="pi pi-arrow-right"></i></button></div><div class="qa-grid"><div class="qa"><span class="qa-icon"><i class="pi pi-th-large"></i></span><span><strong>{{seats.totalDesks}}</strong> total desks</span></div><div class="qa"><span class="qa-icon"><i class="pi pi-user"></i></span><span><strong>{{seats.assignedDesks}}</strong> assigned</span></div><div class="qa"><span class="qa-icon"><i class="pi pi-check-circle"></i></span><span><strong>{{seats.availableDesks}}</strong> available</span></div><div class="qa"><span class="qa-icon"><i class="pi pi-chart-pie"></i></span><span><strong>{{seats.utilizationPercent.toFixed(1)}}%</strong> utilized</span></div></div></section>}
 
         <div class="grid mt-2">
           <!-- Workforce distribution -->
@@ -415,6 +417,8 @@ export class Dashboard implements OnInit {
   readonly auth = inject(AuthService);
   readonly askOms = inject(AskOmsService);
   private readonly router = inject(Router);
+  private readonly workplaceApi = inject(WorkplaceService);
+  readonly workplace = signal<WorkplaceSummary|null>(null);
 
   readonly skeletons = [1, 2, 3, 4];
   readonly today = new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
@@ -442,11 +446,15 @@ export class Dashboard implements OnInit {
 
   ngOnInit(): void {
     this.svc.refresh();
+    this.loadWorkplace();
   }
 
   onCompany(value: number | null): void {
     this.svc.selectedCompanyId.set(value);
+    this.loadWorkplace();
   }
+
+  private loadWorkplace():void{if(!this.auth.canEditOrgData())return;const companyId=this.auth.isSuperAdmin()?(this.svc.selectedCompanyId()??this.svc.availableCompanies()[0]?.id):undefined;if(this.auth.isSuperAdmin()&&companyId==null)return;this.workplaceApi.summary(companyId).subscribe({next:x=>this.workplace.set(x),error:()=>this.workplace.set(null)})}
 
   tint(color: string): string {
     return `color-mix(in srgb, ${color} 16%, transparent)`;

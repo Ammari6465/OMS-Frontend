@@ -33,6 +33,7 @@ export const NAV_SECTIONS: NavSection[] = [
   {
     title: 'Organisation',
     items: [
+      { label: 'Workplaces', icon: 'pi pi-map', route: '/workplaces', implemented: true },
       { label: 'Companies', icon: 'pi pi-building', route: '/companies', roles: ADMINS, implemented: true },
       { label: 'Departments', icon: 'pi pi-briefcase', route: '/departments', roles: ADMINS, implemented: true },
       { label: 'Staff', icon: 'pi pi-users', route: '/staff', implemented: true },
