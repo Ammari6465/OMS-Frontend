@@ -272,8 +272,9 @@ export class OrganogramViewer {
     this.exportVisible = false;
   }
   print() {
-    this.exports.print();
+    const data = this.s.data();
     this.exportVisible = false;
+    if (data) this.exports.print(data);
   }
   @HostListener('document:keydown.escape') escape() {
     if (this.managerVisible) this.managerVisible = false;
