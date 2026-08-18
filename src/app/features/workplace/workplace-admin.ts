@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule } from '@angular/forms';import { ActivatedRoute, Router } from '@angular/router';import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';import { DialogModule } from 'primeng/dialog';import { InputTextModule } from 'primeng/inputtext';import { SelectModule } from 'primeng/select';import { TableModule } from 'primeng/table';import { TagModule } from 'primeng/tag';import { CheckboxModule } from 'primeng/checkbox';import { TextareaModule } from 'primeng/textarea';import { TooltipModule } from 'primeng/tooltip';
-import { finalize, forkJoin } from 'rxjs';import { OrgDataService } from '../../core/data/org-data.service';import { AuthService } from '../../core/services/auth.service';import { Role } from '../../core/models/enums';import { Building, Desk, Floor, Office, WorkplaceService, Zone } from './workplace.service';
+import { Observable, finalize, forkJoin } from 'rxjs';import { OrgDataService } from '../../core/data/org-data.service';import { AuthService } from '../../core/services/auth.service';import { Role } from '../../core/models/enums';import { Building, Desk, Floor, Office, WorkplaceService, Zone } from './workplace.service';
 
 /** The six administration tabs, in hierarchy order. `assignments` is derived from desk data. */
 type Tab='offices'|'buildings'|'floors'|'zones'|'desks'|'assignments';
@@ -164,7 +164,7 @@ export class WorkplaceAdmin implements OnInit{
  }
 
  /** Builds the create or update call for the active tab. Updates carry the version for optimistic locking. */
- private buildRequest(v:any,tab:Tab,id:number|null){
+ private buildRequest(v:any,tab:Tab,id:number|null):Observable<unknown>{
   const status=v.status;
   if(tab==='offices'){const body={companyId:v.companyId,name:v.name.trim(),code:v.code.trim(),city:v.city||null,country:v.country||null,timeZone:v.timeZone.trim(),address:v.address||null,status,version:this.editingVersion};return id?this.api.updateOffice(id,body):this.api.createOffice(body)}
   if(tab==='buildings'){const body={officeId:v.parentId,name:v.name.trim(),code:v.code.trim(),description:null,status,version:this.editingVersion};return id?this.api.updateBuilding(id,body):this.api.createBuilding(body)}
