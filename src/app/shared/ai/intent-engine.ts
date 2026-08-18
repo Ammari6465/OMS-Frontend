@@ -497,6 +497,19 @@ function noPersonResult(intent: AiIntentKind, query: string): AiResult {
   };
 }
 
+/**
+ * True only for organisation counting language. In particular, a bare
+ * "number" is deliberately excluded so "What is Sarah's number?" remains a
+ * contact lookup while "Number of staff in Finance" becomes a headcount.
+ */
+function isStaffHeadcountQuery(text: string): boolean {
+  return (
+    /\b(?:head\s*count|staff count|employee count|people count|team size|strength|size of|how big|how large)\b/i.test(text) ||
+    /\b(?:how many|number of|total number of|count of)\s+(?:active\s+)?(?:staff|employees?|people|personnel|team members?)\b/i.test(text) ||
+    /\b(?:total\s+(?:staff|employees?|people)|(?:staff|employee|people)\s+total)\b/i.test(text)
+  );
+}
+
 // ---- Hierarchy & Team Helpers -----------------------------------------------
 
 function getDescendantIds(rootId: number, staff: Staff[]): number[] {
@@ -678,6 +691,27 @@ function getDepartmentDetail(dept: Department, ctx: AiDataContext): AiResult {
     ],
     updatedContext,
     tone: 'normal',
+  };
+}
+
+/** Answers a scoped counting question without dumping the full staff roster. */
+function getDepartmentHeadcount(dept: Department, ctx: AiDataContext): AiResult {
+  const count = ctx.staff.filter((s) => s.deptId === dept.id).length;
+  return {
+    intent: 'department-stats',
+    context: { department: dept.name, employeeCount: count },
+    answer: `${dept.name} has ${plural(count, 'staff member')}.`,
+    blocks: [buildDepartmentBlock(dept, ctx)],
+    actions: [{ kind: 'navigate', label: `View ${dept.name} Staff`, route: '/staff', deptId: dept.id, icon: 'pi pi-users' }],
+    updatedContext: {
+      departmentId: dept.id,
+      departmentName: dept.name,
+      companyId: dept.companyId,
+      companyName: ctx.companyName(dept.companyId),
+      lastEntityType: 'department',
+      lastIntent: 'department-stats',
+    },
+    tone: count ? 'normal' : 'empty',
   };
 }
 
@@ -1543,6 +1577,16 @@ export function interpret(rawQuery: string, ctx: AiDataContext): AiResult {
     return noPersonResult('reporting-hierarchy', query);
   }
 
+  // 8b. Scoped department headcount must precede contact lookup because
+  // phrases such as "number of staff" contain the otherwise-contact keyword
+  // "number".
+  const deptMatch = matchDepartmentWithContext(query, ctx);
+  if (isStaffHeadcountQuery(normalized)) {
+    if (deptMatch) return getDepartmentHeadcount(deptMatch, ctx);
+    const scope = explicitScopeName(normalized);
+    if (scope) return departmentNotFound(scope, ctx);
+  }
+
   // 9. Contact details: "Contact details for Sarah", "What is her email/phone?"
   if (hasTerm(normalized, CONTACT_TERMS) || /\bnumber\b|\bcall\b/.test(normalized)) {
     const people = matchStaffWithContext(query, ctx);
@@ -1643,7 +1687,6 @@ export function interpret(rawQuery: string, ctx: AiDataContext): AiResult {
   }
 
   // 11. Department-Scoped Staff & Managers Queries: "Show employees in Finance", "Managers in IT"
-  const deptMatch = matchDepartmentWithContext(query, ctx);
   if (deptMatch && (/\b(employees|staff|people|who works|managers|headcount)\b/i.test(q) || q.split(/\s+/).length <= 4)) {
     if (/\b(manager|managers|leads|supervisors)\b/i.test(q)) {
       const deptStaff = ctx.staff.filter((s) => s.deptId === deptMatch.id);

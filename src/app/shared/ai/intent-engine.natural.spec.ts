@@ -145,11 +145,45 @@ describe('Ask OMS — department phrasings', () => {
   });
 
   it('answers headcount phrasings from the department card', () => {
-    for (const q of ['How many people are in Finance?', 'Finance headcount', 'Size of Finance', 'How big is Finance?']) {
+    for (const q of [
+      'How many people are in Finance?',
+      'Number of Staff in Finance',
+      'Number of employees in Finance',
+      'Total staff in Finance',
+      'Staff count for Finance',
+      'Finance headcount',
+      'Size of Finance',
+      'How big is Finance?',
+    ]) {
       const r = interpret(q, ctx);
       expect(['department-scoped', 'department-stats'], q).toContain(r.intent);
       expect(r.answer, q).toContain('Finance');
+      expect(r.answer, q).toContain('1 staff member');
     }
+  });
+
+  it('handles a multi-word department name in a number-of-staff question', () => {
+    const engineering = { id: 400, companyId: 10, name: 'Engineering and Technology', status: EntityStatus.ACTIVE } as Department;
+    const engineeringContext: AiDataContext = {
+      ...ctx,
+      departments: [...departments, engineering],
+      staff: [
+        ...staff,
+        { ...staff[2], id: 40, name: 'Dev One', employeeCode: 'EMP-040', deptId: 400 } as Staff,
+        { ...staff[2], id: 41, name: 'Dev Two', employeeCode: 'EMP-041', deptId: 400 } as Staff,
+      ],
+    };
+
+    const r = interpret('Number of Staff in Engineering and Technology', engineeringContext);
+    expect(r.intent).toBe('department-stats');
+    expect(r.answer).toBe('Engineering and Technology has 2 staff members.');
+    expect(r.context).toMatchObject({ department: 'Engineering and Technology', employeeCount: 2 });
+  });
+
+  it('keeps a person phone-number question as contact information', () => {
+    const r = interpret("What is John's number?", ctx);
+    expect(r.intent).toBe('contact-info');
+    expect(r.answer).toContain('0771234567');
   });
 
   it('resolves department-head phrasings to the head, not the whole department', () => {

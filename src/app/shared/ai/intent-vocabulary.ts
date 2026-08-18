@@ -76,7 +76,8 @@ export const HEAD_TERMS = [
 /** Size / counting questions. */
 export const HEADCOUNT_TERMS = [
   'how many', 'head count', 'headcount', 'how big', 'how large', 'size of', 'total number', 'number of',
-  'staff count', 'employee count', 'strength',
+  'count of staff', 'count of employees', 'count of people', 'staff count', 'employee count', 'people count',
+  'total staff', 'total employees', 'total people', 'staff total', 'employee total', 'team size', 'strength',
 ];
 
 /** Side-by-side questions. */

@@ -37,6 +37,12 @@ describe('Ask OMS intent classifier', () => {
     expect(top.confidence).toBeGreaterThanOrEqual(CONFIDENCE.execute);
   });
 
+  it('ranks staff-count language as department statistics, not contact info', () => {
+    for (const query of ['Number of Staff in Engineering and Technology', 'Total employees in Finance', 'Staff count for IT']) {
+      expect(rankIntents(nq(query))[0]?.intent, query).toBe('department-stats');
+    }
+  });
+
   it('scores a typo into the clarify band rather than the execute band', () => {
     const top = bestIntent(nq('Any vacany'));
     expect(top?.intent).toBe('vacancies');
