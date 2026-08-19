@@ -272,9 +272,31 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     expect(component.availableCount()).toBe(1);
   });
 
-  it('navigates to the selected floor map route', async () => {
+  it('uploads a floor plan and refreshes the floor map', async () => {
     await setup();
     loadHierarchy();
-    expect(router.navigate).toHaveBeenCalledWith(['/workplaces/floors', 7, 'map'], expect.objectContaining({ replaceUrl: true }));
+    const file = new File(['<svg></svg>'], 'floor.svg', { type: 'image/svg+xml' });
+    const event = { target: { files: [file], value: 'floor.svg' } } as any;
+    component.upload(event);
+    const req = http.expectOne((r) => r.url.endsWith('/floors/7/plan') && r.method === 'POST');
+    req.flush({ success: true, data: { ...floor, hasPlan: true }, timestamp: '' });
+    http.expectOne((r) => r.url.endsWith('/floors/7/map')).flush({ success: true, data: { floor: { ...floor, hasPlan: true }, zones: [], desks: [] }, timestamp: '' });
+    http.expectOne((r) => r.url.endsWith('/floors/7/plan')).flush(new Blob(['<svg></svg>'], { type: 'image/svg+xml' }));
+    expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success', summary: 'Floor plan uploaded' }));
+    expect(event.target.value).toBe('');
+  });
+
+  it('shows an error message when floor plan upload fails', async () => {
+    await setup();
+    loadHierarchy();
+    const file = new File(['bad'], 'broken.png', { type: 'image/png' });
+    const event = { target: { files: [file], value: 'broken.png' } } as any;
+    component.upload(event);
+    const req = http.expectOne((r) => r.url.endsWith('/floors/7/plan') && r.method === 'POST');
+    req.flush({ success: false, message: 'Invalid floor plan image' }, { status: 400, statusText: 'Bad Request' });
+    expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ severity: 'error', summary: 'Upload failed' }));
+    expect(component.saving()).toBe(false);
+    expect(event.target.value).toBe('');
   });
 });
+
