@@ -103,25 +103,12 @@ export class OrgDataService {
   }
 
   /**
-   * Companies selectable as a parent. Excludes the company being edited and its
-   * descendants, since either would create a cycle the API rejects.
+   * Only the holding company can be selected as a parent. Sister concerns are
+   * peers and may not be nested under one another.
    */
   parentCompanyOptions(excludeId?: number | null): Option[] {
-    const all = this.companies.snapshot();
-    const blocked = new Set<number>();
-    if (excludeId != null) {
-      blocked.add(excludeId);
-      for (let added = true; added; ) {
-        added = false;
-        for (const c of all) {
-          if (!blocked.has(c.id) && c.parentCompanyId != null && blocked.has(c.parentCompanyId)) {
-            blocked.add(c.id);
-            added = true;
-          }
-        }
-      }
-    }
-    return all.filter((c) => !blocked.has(c.id)).map((c) => ({ label: c.name, value: c.id }));
+    const parent = this.groupParent();
+    return parent && parent.id !== excludeId ? [{ label: parent.name, value: parent.id }] : [];
   }
 
   /** Sister concerns of a company, i.e. its direct children in the group. */
