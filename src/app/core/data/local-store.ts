@@ -52,6 +52,15 @@ export class LocalStore<T extends Audited> {
     return source.pipe(map((items) => this.toPage(items, query)));
   }
 
+  /**
+   * Re-reads the collection from the API. Needed after a write that changes
+   * other rows too — re-parenting a company, for example, also shifts the
+   * sister-concern counts of the old and new parent.
+   */
+  refresh(): Observable<T[]> {
+    return this.fetchAll();
+  }
+
   snapshot(includeDeleted = false): T[] {
     return this.items().filter((item) => includeDeleted || !item.isDeleted);
   }

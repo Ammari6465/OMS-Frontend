@@ -16,6 +16,7 @@ describe('CompanyList Component UI & Operations', () => {
   let messageServiceMock: any;
   let confirmationServiceMock: any;
 
+  /** The group holding company: no parent, one sister concern. */
   const mockCompany: Company = {
     id: 1,
     name: 'Sunrich Holdings',
@@ -24,17 +25,36 @@ describe('CompanyList Component UI & Operations', () => {
     dateEstablished: '2020-01-01',
     status: EntityStatus.ACTIVE,
     isDeleted: false,
+    parentCompanyId: null,
+    parentCompanyName: null,
+    isGroupParent: true,
+    sisterConcernCount: 1,
+  };
+
+  const mockSister: Company = {
+    id: 2,
+    name: 'Sunrich Tiles',
+    status: EntityStatus.ACTIVE,
+    isDeleted: false,
+    parentCompanyId: 1,
+    parentCompanyName: 'Sunrich Holdings',
+    isGroupParent: false,
+    sisterConcernCount: 0,
   };
 
   beforeEach(async () => {
     orgDataMock = {
       companies: {
-        list: vi.fn().mockReturnValue(of({ content: [mockCompany], totalElements: 1 })),
-        create: vi.fn().mockReturnValue(of(mockCompany)),
+        list: vi.fn().mockReturnValue(of({ content: [mockCompany, mockSister], totalElements: 2 })),
+        refresh: vi.fn().mockReturnValue(of([mockCompany, mockSister])),
+        create: vi.fn().mockReturnValue(of(mockSister)),
         update: vi.fn().mockReturnValue(of({ ...mockCompany, name: 'Updated Holdings' })),
         softDelete: vi.fn().mockReturnValue(of(null)),
         restore: vi.fn().mockReturnValue(of(mockCompany)),
       },
+      groupParent: vi.fn().mockReturnValue(mockCompany),
+      parentCompanyOptions: vi.fn().mockReturnValue([{ label: 'Sunrich Holdings', value: 1 }]),
+      sisterConcerns: vi.fn().mockReturnValue([]),
     };
 
     messageServiceMock = {
@@ -66,18 +86,20 @@ describe('CompanyList Component UI & Operations', () => {
       sort: 'name',
       direction: 'asc',
     });
-    expect(component.rows()).toEqual([mockCompany]);
+    expect(component.rows()).toEqual([mockCompany, mockSister]);
   });
 
-  it('[POSITIVE] openCreate resets form and displays modal dialog', () => {
+  it('[POSITIVE] openCreate resets form and defaults the parent to the holding company', () => {
     component.openCreate();
     expect(component.editingId()).toBeNull();
     expect(component.dialogVisible).toBe(true);
     expect(component.form.value.name).toBe('');
     expect(component.form.value.status).toBe(EntityStatus.ACTIVE);
+    expect(component.form.value.parentCompanyId).toBe(1);
+    expect(component.isGroupParent()).toBe(false);
   });
 
-  it('[POSITIVE] save creates new company and displays success toast', () => {
+  it('[POSITIVE] save creates new company as a sister concern and displays success toast', () => {
     component.openCreate();
     component.form.patchValue({
       name: 'New Sunrich Branch',
@@ -94,6 +116,7 @@ describe('CompanyList Component UI & Operations', () => {
       headOffice: 'Kandy',
       dateEstablished: '',
       status: EntityStatus.ACTIVE,
+      parentCompanyId: 1,
     });
     expect(messageServiceMock.add).toHaveBeenCalledWith({
       severity: 'success',
@@ -119,12 +142,26 @@ describe('CompanyList Component UI & Operations', () => {
       headOffice: 'Colombo',
       dateEstablished: '2020-01-01',
       status: EntityStatus.ACTIVE,
+      parentCompanyId: null,
     });
     expect(messageServiceMock.add).toHaveBeenCalledWith({
       severity: 'success',
       summary: 'Company updated',
       detail: 'Updated Holdings',
     });
+  });
+
+  it('[POSITIVE] openEdit on the holding company hides the parent selector', () => {
+    component.openEdit(mockCompany);
+    expect(component.isGroupParent()).toBe(true);
+  });
+
+  it('[POSITIVE] openEdit on a sister concern offers parents excluding itself', () => {
+    component.openEdit(mockSister);
+
+    expect(component.isGroupParent()).toBe(false);
+    expect(component.form.value.parentCompanyId).toBe(1);
+    expect(orgDataMock.parentCompanyOptions).toHaveBeenCalledWith(2);
   });
 
   it('[POSITIVE] toggleArchived reloads companies with includeDeleted parameter', () => {
@@ -147,5 +184,24 @@ describe('CompanyList Component UI & Operations', () => {
     expect(component.form.controls.name.touched).toBe(true);
     expect(orgDataMock.companies.create).not.toHaveBeenCalled();
     expect(component.dialogVisible).toBe(true);
+  });
+
+  it('[NEGATIVE] archiving a company that still has sister concerns is blocked', () => {
+    orgDataMock.sisterConcerns.mockReturnValue([mockSister]);
+
+    component.confirmDelete(mockCompany);
+
+    expect(confirmationServiceMock.confirm).not.toHaveBeenCalled();
+    expect(orgDataMock.companies.softDelete).not.toHaveBeenCalled();
+    expect(messageServiceMock.add).toHaveBeenCalledWith(
+      expect.objectContaining({ severity: 'warn', summary: 'Cannot archive' }),
+    );
+  });
+
+  it('[POSITIVE] archiving a leaf company proceeds and refreshes the list', () => {
+    component.confirmDelete(mockSister);
+
+    expect(orgDataMock.companies.softDelete).toHaveBeenCalledWith(2);
+    expect(orgDataMock.companies.refresh).toHaveBeenCalled();
   });
 });

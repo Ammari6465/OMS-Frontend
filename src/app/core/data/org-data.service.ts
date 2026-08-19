@@ -21,7 +21,8 @@ export class OrgDataService {
   private readonly http = inject(HttpClient);
   private readonly recordsUrl = `${environment.apiUrl}/records`;
 
-  readonly companies = new LocalStore<Company>(this.http, `${this.recordsUrl}/companies`, ['name', 'regNumber', 'headOffice'],
+  readonly companies = new LocalStore<Company>(this.http, `${this.recordsUrl}/companies`,
+    ['name', 'regNumber', 'headOffice', 'parentCompanyName'],
   );
   readonly departments = new LocalStore<Department>(this.http, `${this.recordsUrl}/departments`, ['name', 'description'],
   );
@@ -94,6 +95,38 @@ export class OrgDataService {
 
   companyOptions(): Option[] {
     return this.companies.snapshot().map((c) => ({ label: c.name, value: c.id }));
+  }
+
+  /** The group holding company — the one company without a parent. */
+  groupParent(): Company | undefined {
+    return this.companies.snapshot().find((c) => c.parentCompanyId == null);
+  }
+
+  /**
+   * Companies selectable as a parent. Excludes the company being edited and its
+   * descendants, since either would create a cycle the API rejects.
+   */
+  parentCompanyOptions(excludeId?: number | null): Option[] {
+    const all = this.companies.snapshot();
+    const blocked = new Set<number>();
+    if (excludeId != null) {
+      blocked.add(excludeId);
+      for (let added = true; added; ) {
+        added = false;
+        for (const c of all) {
+          if (!blocked.has(c.id) && c.parentCompanyId != null && blocked.has(c.parentCompanyId)) {
+            blocked.add(c.id);
+            added = true;
+          }
+        }
+      }
+    }
+    return all.filter((c) => !blocked.has(c.id)).map((c) => ({ label: c.name, value: c.id }));
+  }
+
+  /** Sister concerns of a company, i.e. its direct children in the group. */
+  sisterConcerns(companyId: number): Company[] {
+    return this.companies.snapshot().filter((c) => c.parentCompanyId === companyId);
   }
 
   departmentOptions(companyId?: number | null): Option[] {

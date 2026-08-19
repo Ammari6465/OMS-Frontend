@@ -1,4 +1,5 @@
 import { Component, OnInit, ViewChild, inject, signal } from '@angular/core';
+import { switchMap } from 'rxjs';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { Table, TableModule } from 'primeng/table';
@@ -46,7 +47,7 @@ import { EntityStatus } from '../../core/models/enums';
           [paginator]="true"
           [rows]="10"
           [rowsPerPageOptions]="[10, 25, 50]"
-          [globalFilterFields]="['name', 'regNumber', 'headOffice']"
+          [globalFilterFields]="['name', 'regNumber', 'headOffice', 'parentCompanyName']"
           [sortField]="'name'"
           [sortOrder]="1"
           dataKey="id"
@@ -71,6 +72,7 @@ import { EntityStatus } from '../../core/models/enums';
           <ng-template #header>
             <tr>
               <th pSortableColumn="name">Name</th>
+              <th pSortableColumn="parentCompanyName">Parent company</th>
               <th pSortableColumn="regNumber">Reg. number</th>
               <th pSortableColumn="headOffice">Head office</th>
               <th pSortableColumn="dateEstablished">Established</th>
@@ -81,7 +83,22 @@ import { EntityStatus } from '../../core/models/enums';
 
           <ng-template #body let-c>
             <tr [class.archived-row]="c.isDeleted">
-              <td><span class="cell-strong">{{ c.name }}</span></td>
+              <td>
+                <span class="cell-strong">{{ c.name }}</span>
+                @if (c.isGroupParent) {
+                  <p-tag value="Group parent" severity="info" styleClass="group-tag" />
+                }
+              </td>
+              <td>
+                @if (c.parentCompanyName) {
+                  {{ c.parentCompanyName }}
+                } @else {
+                  <span class="muted">Holding company</span>
+                }
+                @if (c.sisterConcernCount) {
+                  <span class="muted"> · {{ c.sisterConcernCount }} sister concern{{ c.sisterConcernCount === 1 ? '' : 's' }}</span>
+                }
+              </td>
               <td>{{ c.regNumber || '—' }}</td>
               <td>{{ c.headOffice || '—' }}</td>
               <td>{{ c.dateEstablished || '—' }}</td>
@@ -108,7 +125,7 @@ import { EntityStatus } from '../../core/models/enums';
 
           <ng-template #emptymessage>
             <tr>
-              <td colspan="6">
+              <td colspan="7">
                 <div class="empty">
                   <i class="pi pi-building"></i>
                   <p>No companies found</p>
@@ -128,6 +145,16 @@ import { EntityStatus } from '../../core/models/enums';
             <label>Company name *</label>
             <input pInputText formControlName="name" class="w-full" placeholder="e.g. Sunrich Foods" />
             @if (invalid('name')) { <small class="err">Name is required.</small> }
+          </div>
+          <div class="field">
+            <label>Parent company</label>
+            @if (isGroupParent()) {
+              <p class="hint">This is the group holding company, so it has no parent.</p>
+            } @else {
+              <p-select formControlName="parentCompanyId" [options]="parentOptions()" optionLabel="label" optionValue="value"
+                placeholder="Select the holding company" styleClass="w-full" appendTo="body" [filter]="true" />
+              <small class="hint">Sister concerns sit under the group holding company.</small>
+            }
           </div>
           <div class="grid-2">
             <div class="field">
@@ -252,6 +279,19 @@ import { EntityStatus } from '../../core/models/enums';
         color: #ef4444;
         font-size: 0.76rem;
       }
+      .muted {
+        color: var(--p-text-muted-color);
+        font-size: 0.85rem;
+      }
+      .hint {
+        color: var(--p-text-muted-color);
+        font-size: 0.76rem;
+        margin: 0.25rem 0 0;
+      }
+      :host ::ng-deep .group-tag {
+        margin-left: 0.5rem;
+        font-size: 0.68rem;
+      }
     `,
   ],
 })
@@ -268,6 +308,9 @@ export class CompanyList implements OnInit {
   readonly saving = signal(false);
   readonly showArchived = signal(false);
   readonly editingId = signal<number | null>(null);
+  /** True while editing the group holding company, which has no parent to pick. */
+  readonly isGroupParent = signal(false);
+  readonly parentOptions = signal<{ label: string; value: number }[]>([]);
 
   dialogVisible = false;
 
@@ -282,18 +325,30 @@ export class CompanyList implements OnInit {
     headOffice: [''],
     dateEstablished: [''],
     status: [EntityStatus.ACTIVE],
+    parentCompanyId: [null as number | null],
   });
 
   ngOnInit(): void {
     this.load();
   }
 
-  private load(): void {
+  /**
+   * @param refresh re-read from the API — parent links change other rows'
+   * sister-concern counts, so a cached list would go stale after a write.
+   */
+  private load(refresh = false): void {
     this.loading.set(true);
-    this.org.companies.list({ size: 1000, includeDeleted: this.showArchived(), sort: 'name', direction: 'asc' }).subscribe((page) => {
+    const source = refresh
+      ? this.org.companies.refresh().pipe(switchMap(() => this.org.companies.list(this.query())))
+      : this.org.companies.list(this.query());
+    source.subscribe((page) => {
       this.rows.set(page.content);
       this.loading.set(false);
     });
+  }
+
+  private query() {
+    return { size: 1000, includeDeleted: this.showArchived(), sort: 'name', direction: 'asc' as const };
   }
 
   toggleArchived(value: boolean): void {
@@ -308,18 +363,31 @@ export class CompanyList implements OnInit {
 
   openCreate(): void {
     this.editingId.set(null);
-    this.form.reset({ name: '', regNumber: '', headOffice: '', dateEstablished: '', status: EntityStatus.ACTIVE });
+    this.isGroupParent.set(false);
+    this.parentOptions.set(this.org.parentCompanyOptions());
+    this.form.reset({
+      name: '',
+      regNumber: '',
+      headOffice: '',
+      dateEstablished: '',
+      status: EntityStatus.ACTIVE,
+      // New companies default to sister concerns of the holding company.
+      parentCompanyId: this.org.groupParent()?.id ?? null,
+    });
     this.dialogVisible = true;
   }
 
   openEdit(c: Company): void {
     this.editingId.set(c.id);
+    this.isGroupParent.set(c.parentCompanyId == null);
+    this.parentOptions.set(this.org.parentCompanyOptions(c.id));
     this.form.reset({
       name: c.name,
       regNumber: c.regNumber ?? '',
       headOffice: c.headOffice ?? '',
       dateEstablished: c.dateEstablished ?? '',
       status: c.status,
+      parentCompanyId: c.parentCompanyId ?? null,
     });
     this.dialogVisible = true;
   }
@@ -338,7 +406,7 @@ export class CompanyList implements OnInit {
     op.subscribe(() => {
       this.saving.set(false);
       this.dialogVisible = false;
-      this.load();
+      this.load(true);
       this.messages.add({
         severity: 'success',
         summary: id ? 'Company updated' : 'Company created',
@@ -348,6 +416,15 @@ export class CompanyList implements OnInit {
   }
 
   confirmDelete(c: Company): void {
+    const dependents = this.org.sisterConcerns(c.id);
+    if (dependents.length) {
+      this.messages.add({
+        severity: 'warn',
+        summary: 'Cannot archive',
+        detail: `${c.name} still has ${dependents.length} sister concern${dependents.length === 1 ? '' : 's'}. Reassign or archive them first.`,
+      });
+      return;
+    }
     this.confirm.confirm({
       header: 'Archive company',
       message: `Archive “${c.name}”? You can restore it later.`,
@@ -357,7 +434,7 @@ export class CompanyList implements OnInit {
       acceptButtonStyleClass: 'p-button-danger',
       accept: () => {
         this.org.companies.softDelete(c.id).subscribe(() => {
-          this.load();
+          this.load(true);
           this.messages.add({ severity: 'info', summary: 'Archived', detail: c.name });
         });
       },
@@ -366,7 +443,7 @@ export class CompanyList implements OnInit {
 
   restore(c: Company): void {
     this.org.companies.restore(c.id).subscribe(() => {
-      this.load();
+      this.load(true);
       this.messages.add({ severity: 'success', summary: 'Restored', detail: c.name });
     });
   }

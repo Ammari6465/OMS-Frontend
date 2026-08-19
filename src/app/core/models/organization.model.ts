@@ -14,6 +14,17 @@ export interface Company extends Audited {
   dateEstablished?: string;
   logoUrl?: string;
   status: EntityStatus;
+  /** Holding company. Null/undefined only for the group parent. */
+  parentCompanyId?: number | null;
+  parentCompanyName?: string | null;
+  isGroupParent?: boolean;
+  sisterConcernCount?: number;
+}
+
+/** The group as a tree: holding company with its sister concerns beneath it. */
+export interface CompanyGroupNode {
+  company: Company;
+  sisterConcerns: CompanyGroupNode[];
 }
 
 export interface Department extends Audited {
