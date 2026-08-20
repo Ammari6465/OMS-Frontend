@@ -1,10 +1,20 @@
-import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { HttpContext, HttpContextToken, HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { MessageService } from 'primeng/api';
 import { catchError, throwError } from 'rxjs';
 
 import { AuthService } from '../services/auth.service';
+
+/**
+ * Set on a request whose caller reports failures itself. Suppresses only the
+ * generic toast — session teardown on 401 and the 403 redirect still run — so a
+ * single failure never produces two competing messages.
+ */
+export const SKIP_ERROR_TOAST = new HttpContextToken<boolean>(() => false);
+
+/** Convenience for `{ context: skipErrorToast() }` on an HttpClient call. */
+export const skipErrorToast = () => new HttpContext().set(SKIP_ERROR_TOAST, true);
 
 /**
  * Centralised HTTP error handling: shows a toast for failures, and on 401
@@ -19,6 +29,7 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
     catchError((error: HttpErrorResponse) => {
       const backendMessage = error.error?.message as string | undefined;
       const isAuthEndpoint = req.url.includes('/auth/login') || req.url.includes('/auth/me');
+      const quiet = req.context.get(SKIP_ERROR_TOAST);
 
       switch (error.status) {
         case 0:
@@ -42,34 +53,42 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
           }
           break;
         case 403:
-          messages.add({
-            severity: 'error',
-            summary: 'Access denied',
-            detail: backendMessage ?? 'You do not have permission to perform this action.',
-          });
+          if (!quiet) {
+            messages.add({
+              severity: 'error',
+              summary: 'Access denied',
+              detail: backendMessage ?? 'You do not have permission to perform this action.',
+            });
+          }
           router.navigate(['/forbidden']);
           break;
         case 422:
         case 400:
-          messages.add({
-            severity: 'error',
-            summary: 'Invalid request',
-            detail: backendMessage ?? 'Please check the form and try again.',
-          });
+          if (!quiet) {
+            messages.add({
+              severity: 'error',
+              summary: 'Invalid request',
+              detail: backendMessage ?? 'Please check the form and try again.',
+            });
+          }
           break;
         case 409:
-          messages.add({
-            severity: 'warn',
-            summary: 'Conflict',
-            detail: backendMessage ?? 'This record conflicts with existing data. Reload and try again.',
-          });
+          if (!quiet) {
+            messages.add({
+              severity: 'warn',
+              summary: 'Conflict',
+              detail: backendMessage ?? 'This record conflicts with existing data. Reload and try again.',
+            });
+          }
           break;
         default:
-          messages.add({
-            severity: 'error',
-            summary: 'Something went wrong',
-            detail: backendMessage ?? `Unexpected error (${error.status}).`,
-          });
+          if (!quiet) {
+            messages.add({
+              severity: 'error',
+              summary: 'Something went wrong',
+              detail: backendMessage ?? `Unexpected error (${error.status}).`,
+            });
+          }
       }
 
       return throwError(() => error);
