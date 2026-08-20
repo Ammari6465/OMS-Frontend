@@ -126,7 +126,7 @@ export class OrgDataService {
   staffOptions(companyId?: number | null): Option[] {
     return this.staff
       .snapshot()
-      .filter((s) => companyId == null || s.companyId === companyId)
+      .filter((s) => companyId == null || (s.companyIds ?? [s.companyId]).includes(companyId))
       .map((s) => ({ label: `${s.name}${s.title ? ' · ' + s.title : ''}`, value: s.id }));
   }
 }

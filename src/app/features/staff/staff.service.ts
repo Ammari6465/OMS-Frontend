@@ -28,6 +28,7 @@ export interface StaffQuery {
 
 export interface StaffCreateRequest {
   companyId: number;
+  additionalCompanyIds?: number[];
   deptId?: number | null;
   managerId?: number | null;
   positionId?: number | null;

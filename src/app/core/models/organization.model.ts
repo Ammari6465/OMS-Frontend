@@ -41,6 +41,9 @@ export interface Department extends Audited {
 export interface Staff extends Audited {
   companyId: number;
   companyName?: string;
+  companyIds?: number[];
+  companyNames?: string[];
+  assignments?: StaffCompanyAssignment[];
   deptId?: number | null;
   departmentName?: string | null;
   managerId?: number | null;
@@ -59,6 +62,21 @@ export interface Staff extends Audited {
   status: EntityStatus;
   photoUrl?: string;
   version: number;
+}
+
+export interface StaffCompanyAssignment {
+  id: number;
+  companyId: number;
+  companyName: string;
+  deptId?: number | null;
+  departmentName?: string | null;
+  managerId?: number | null;
+  managerName?: string | null;
+  title?: string | null;
+  isPrimary: boolean;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
+  status: EntityStatus;
 }
 
 export interface Position extends Audited {

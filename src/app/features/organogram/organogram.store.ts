@@ -5,6 +5,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { MessageService } from 'primeng/api';
 import { debounceTime, filter, finalize, Subject } from 'rxjs';
 import { OrgDataService } from '../../core/data/org-data.service';
+import { AuthService } from '../../core/services/auth.service';
 import { OrganogramApiService } from './organogram-api.service';
 import { buildHierarchy, matchesNode } from './hierarchy-builder';
 import { OrganogramNode, OrganogramResponse, OrganogramView } from './organogram.models';
@@ -14,6 +15,7 @@ import { OrganogramRealtimeService } from './organogram-realtime.service';
 export class OrganogramStore implements OnDestroy {
   private readonly api = inject(OrganogramApiService);
   private readonly org = inject(OrgDataService);
+  private readonly auth = inject(AuthService);
   private readonly realtime = inject(OrganogramRealtimeService);
   private readonly messages = inject(MessageService);
   private readonly router = inject(Router);
@@ -38,7 +40,13 @@ export class OrganogramStore implements OnDestroy {
   readonly pan = signal({ x: 0, y: 0 });
   readonly editMode = signal(false);
   readonly undoChange = signal<{ person: OrganogramNode; managerId: number | null } | null>(null);
-  readonly companyOptions = computed(() => this.org.companyOptions());
+  readonly companyOptions = computed(() => {
+    const options = this.org.companyOptions();
+    if (this.auth.isSuperAdmin()) return options;
+    const user = this.auth.currentUser();
+    const allowed = new Set(user?.companyIds ?? (user?.companyId == null ? [] : [user.companyId]));
+    return options.filter((option) => allowed.has(option.value));
+  });
   readonly departments = computed(() => this.data()?.departments ?? []);
   readonly hierarchy = computed(() =>
     buildHierarchy(this.filteredNodes(), this.data()?.rootIds ?? []),
@@ -72,7 +80,7 @@ export class OrganogramStore implements OnDestroy {
     this.companyId.set(
       Number.isFinite(company) && company > 0
         ? company
-        : (this.org.companyOptions()[0]?.value ?? null),
+        : (this.companyOptions()[0]?.value ?? null),
     );
     if (mode === 'POSITION') this.view.set('POSITION');
     if (Number.isFinite(selected) && selected > 0) this.selectedId.set(selected);

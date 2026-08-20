@@ -7,6 +7,7 @@ import { AvatarModule } from 'primeng/avatar';
 import { ButtonModule } from 'primeng/button';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
+import { MultiSelectModule } from 'primeng/multiselect';
 import { SelectModule } from 'primeng/select';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
@@ -35,7 +36,7 @@ const dateRangeValidator = (control: AbstractControl): ValidationErrors | null =
   selector: 'app-staff-list',
   imports: [
     ReactiveFormsModule, FormsModule, TableModule, ButtonModule, InputTextModule, DialogModule,
-    SelectModule, TagModule, TooltipModule, ToggleSwitchModule, AvatarModule,
+    SelectModule, MultiSelectModule, TagModule, TooltipModule, ToggleSwitchModule, AvatarModule,
   ],
   template: `
     <div class="oms-page">
@@ -132,7 +133,12 @@ const dateRangeValidator = (control: AbstractControl): ValidationErrors | null =
                 <div>{{ member.email || '—' }}</div>
                 <div class="muted contact-phone">{{ member.cellNumber || member.landline || 'No phone' }}</div>
               </td>
-              <td>{{ member.companyName || org.companyName(member.companyId) }}</td>
+              <td>
+                <div>{{ member.companyName || org.companyName(member.companyId) }}</div>
+                @if ((member.companyIds?.length || 0) > 1) {
+                  <div class="muted company-count">+{{ (member.companyIds?.length || 1) - 1 }} sister concern(s)</div>
+                }
+              </td>
               <td>{{ member.departmentName || org.departmentName(member.deptId) }}</td>
               <td>{{ member.positionTitle || member.title || '—' }}</td>
               <td>{{ member.managerName || org.staffName(member.managerId) }}</td>
@@ -224,10 +230,17 @@ const dateRangeValidator = (control: AbstractControl): ValidationErrors | null =
           <div class="form-section-title">Organisation</div>
           <div class="form-grid">
             <div class="field">
-              <label>Company *</label>
+              <label>Primary company *</label>
               <p-select formControlName="companyId" [options]="companyOptions()" optionLabel="label" optionValue="value"
                 placeholder="Select company" styleClass="w-full" appendTo="body" />
               @if (invalid('companyId')) { <small class="error-text">Company is required.</small> }
+            </div>
+            <div class="field span-2">
+              <label>Additional sister concerns</label>
+              <p-multiselect formControlName="additionalCompanyIds" [options]="additionalCompanyOptions()"
+                optionLabel="label" optionValue="value" placeholder="Select every other company this employee works for"
+                display="chip" [filter]="true" styleClass="w-full" appendTo="body" />
+              <small class="field-help">One employee record is shared across all selected Sunrich companies. The primary company owns the default department and reporting line.</small>
             </div>
             <div class="field">
               <label>Department</label>
@@ -284,7 +297,7 @@ const dateRangeValidator = (control: AbstractControl): ValidationErrors | null =
           <div class="details-grid">
             <div><span>Email</span><strong>{{ member.email || 'Not provided' }}</strong></div>
             <div><span>Phone</span><strong>{{ member.cellNumber || member.landline || 'Not provided' }}</strong></div>
-            <div><span>Company</span><strong>{{ member.companyName || org.companyName(member.companyId) }}</strong></div>
+            <div class="span-2"><span>Companies</span><strong>{{ member.companyNames?.join(', ') || member.companyName || org.companyName(member.companyId) }}</strong></div>
             <div><span>Department</span><strong>{{ member.departmentName || org.departmentName(member.deptId) }}</strong></div>
             <div><span>Position</span><strong>{{ member.positionTitle || member.title || 'Unassigned' }}</strong></div>
             <div><span>Manager</span><strong>{{ member.managerName || org.staffName(member.managerId) }}</strong></div>
@@ -454,6 +467,8 @@ export class StaffList {
       ? options
       : options.filter((option) => option.value === user.companyId);
   });
+  readonly additionalCompanyOptions = computed<Option[]>(() =>
+    this.companyOptions().filter((option) => option.value !== this.selectedCompany()));
   readonly companyFilterOptions = computed(() => [
     { label: 'All companies', value: null as number | null },
     ...this.companyOptions(),
@@ -506,6 +521,7 @@ export class StaffList {
     name: ['', [Validators.required, Validators.maxLength(200)]],
     employeeCode: ['', [Validators.maxLength(100), Validators.pattern(/^[A-Za-z0-9][A-Za-z0-9_-]*$/)]],
     companyId: [null as number | null, Validators.required],
+    additionalCompanyIds: [[] as number[]],
     deptId: [null as number | null],
     positionId: [null as number | null],
     managerId: [null as number | null],
@@ -666,6 +682,7 @@ export class StaffList {
     this.selectedDepartment.set(null);
     this.form.reset({
       name: '', employeeCode: '', companyId: defaultCompany, deptId: null, positionId: null,
+      additionalCompanyIds: [],
       managerId: null, title: '', empType: EmploymentType.PERMANENT, email: '', cellNumber: '',
       landline: '', photoUrl: '', status: EntityStatus.ACTIVE, dateJoined: '', dateLeft: '',
     });
@@ -680,6 +697,7 @@ export class StaffList {
       name: member.name,
       employeeCode: member.employeeCode ?? '',
       companyId: member.companyId,
+      additionalCompanyIds: (member.companyIds ?? [member.companyId]).filter((id) => id !== member.companyId),
       deptId: member.deptId ?? null,
       positionId: member.positionId ?? null,
       managerId: member.managerId ?? null,
@@ -886,6 +904,7 @@ export class StaffList {
     const value = this.form.getRawValue();
     const payload: StaffCreateRequest = {
       companyId: value.companyId!,
+      additionalCompanyIds: value.additionalCompanyIds.filter((companyId) => companyId !== value.companyId),
       deptId: value.deptId,
       managerId: value.managerId,
       positionId: value.positionId,

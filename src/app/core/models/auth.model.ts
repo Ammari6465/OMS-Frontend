@@ -20,6 +20,7 @@ export interface CurrentUser {
   fullName?: string;
   role: Role;
   companyId?: number;
+  companyIds?: number[];
   staffId?: number;
 }
 
