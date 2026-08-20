@@ -57,6 +57,7 @@ describe('WorkplaceMap Component UI & Interactions', () => {
             // Company 11 is a sister concern of holding company 10.
             companyGroupIds: (id: number) => new Set(id === 10 ? [10, 11] : [id]),
             companyAncestorIds: (id: number) => (id === 11 ? [11, 10] : [id]),
+            companyName: (id: number) => (id === 10 ? 'Sunrich Companies' : 'Sunrich Logistics'),
           },
         },
       ],
@@ -83,54 +84,17 @@ describe('WorkplaceMap Component UI & Interactions', () => {
 
   afterEach(() => { http.verify(); role = Role.SUPER_ADMIN; });
 
-  it('[POSITIVE] selecting the holding company lists its sister concerns offices too', async () => {
+  it('[POSITIVE] a sister concern sees the holding company shared premises', async () => {
     await setup();
     fixture.detectChanges();
+    // Ashford Centre belongs to holding company 10 and is shared with the group.
     http.expectOne((r) => r.url.endsWith('/offices')).flush({ success: true, data: [
-      { id: 2, companyId: 10, companyName: 'Sunrich Companies', name: 'Head Office' },
-      { id: 9, companyId: 11, companyName: 'Sunrich Logistics', name: 'Ashford Centre' },
+      { id: 9, companyId: 10, companyName: 'Sunrich Companies', name: 'Ashford Centre' },
+      { id: 4, companyId: 11, companyName: 'Sunrich Logistics', name: 'Logistics Depot' },
     ], timestamp: '' });
     http.expectOne((r) => r.url.endsWith('/buildings')).flush({ success: true, data: [
-      { id: 3, officeId: 9, companyId: 11, name: 'Ashford Centre' },
+      { id: 3, officeId: 9, companyId: 10, name: 'Ashford Centre' },
     ], timestamp: '' });
-    http.expectOne((r) => r.url.endsWith('/floors')).flush({ success: true, data: [], timestamp: '' });
-
-    component.selectCompany(10);
-    http.expectOne((r) => r.url.includes('/summary')).flush({ success: true, data: {
-      totalDesks: 0, assignedDesks: 0, availableDesks: 0, unavailableDesks: 0, staffWithoutDesks: 0, utilizationPercent: 0,
-    }, timestamp: '' });
-
-    // The sister concern's office is offered, tagged with its owning company,
-    // and its building comes along rather than being filtered out.
-    expect(component.officeOptions().map((o) => o.label))
-      .toEqual(['Head Office', 'Ashford Centre · Sunrich Logistics']);
-    expect(component.filteredBuildings().map((b) => b.name)).toEqual(['Ashford Centre']);
-  });
-
-  it('[NEGATIVE] company selector omits companies with no reachable workplace records', async () => {
-    await setup();
-    fixture.detectChanges();
-    // The company endpoint is unscoped, so it offers Sunrich (10) even when the
-    // only office this user can load belongs to sister concern 11.
-    http.expectOne((r) => r.url.endsWith('/offices')).flush({ success: true, data: [
-      { id: 9, companyId: 11, companyName: 'Sunrich Logistics', name: 'Ashford Centre' },
-    ], timestamp: '' });
-    http.expectOne((r) => r.url.endsWith('/buildings')).flush({ success: true, data: [], timestamp: '' });
-    http.expectOne((r) => r.url.endsWith('/floors')).flush({ success: true, data: [], timestamp: '' });
-
-    // Company 10 survives only as the parent that rolls 11 up; an unrelated
-    // company with no workplace records would be dropped entirely.
-    expect(component.companyOptions().map((o) => o.value)).toEqual([10]);
-  });
-
-  it('[NEGATIVE] selecting a sister concern hides other companies offices', async () => {
-    await setup();
-    fixture.detectChanges();
-    http.expectOne((r) => r.url.endsWith('/offices')).flush({ success: true, data: [
-      { id: 2, companyId: 10, companyName: 'Sunrich Companies', name: 'Head Office' },
-      { id: 9, companyId: 11, companyName: 'Sunrich Logistics', name: 'Ashford Centre' },
-    ], timestamp: '' });
-    http.expectOne((r) => r.url.endsWith('/buildings')).flush({ success: true, data: [], timestamp: '' });
     http.expectOne((r) => r.url.endsWith('/floors')).flush({ success: true, data: [], timestamp: '' });
 
     component.selectCompany(11);
@@ -138,7 +102,43 @@ describe('WorkplaceMap Component UI & Interactions', () => {
       totalDesks: 0, assignedDesks: 0, availableDesks: 0, unavailableDesks: 0, staffWithoutDesks: 0, utilizationPercent: 0,
     }, timestamp: '' });
 
+    // Own office first-class, inherited one tagged with the owning company, and
+    // the shared building comes along rather than being filtered out.
+    expect(component.officeOptions().map((o) => o.label))
+      .toEqual(['Ashford Centre · Sunrich Companies', 'Logistics Depot']);
+    expect(component.filteredBuildings().map((b) => b.name)).toEqual(['Ashford Centre']);
+  });
+
+  it('[NEGATIVE] the holding company does not inherit a sister concerns own office', async () => {
+    await setup();
+    fixture.detectChanges();
+    http.expectOne((r) => r.url.endsWith('/offices')).flush({ success: true, data: [
+      { id: 9, companyId: 10, companyName: 'Sunrich Companies', name: 'Ashford Centre' },
+      { id: 4, companyId: 11, companyName: 'Sunrich Logistics', name: 'Logistics Depot' },
+    ], timestamp: '' });
+    http.expectOne((r) => r.url.endsWith('/buildings')).flush({ success: true, data: [], timestamp: '' });
+    http.expectOne((r) => r.url.endsWith('/floors')).flush({ success: true, data: [], timestamp: '' });
+
+    component.selectCompany(10);
+    http.expectOne((r) => r.url.includes('/summary')).flush({ success: true, data: {
+      totalDesks: 0, assignedDesks: 0, availableDesks: 0, unavailableDesks: 0, staffWithoutDesks: 0, utilizationPercent: 0,
+    }, timestamp: '' });
+
     expect(component.officeOptions().map((o) => o.label)).toEqual(['Ashford Centre']);
+  });
+
+  it('[POSITIVE] an office on the holding company keeps every concern selectable', async () => {
+    await setup();
+    fixture.detectChanges();
+    // Shared premises flow down, so both 10 and its concern 11 stay selectable
+    // even though only company 10 owns a record.
+    http.expectOne((r) => r.url.endsWith('/offices')).flush({ success: true, data: [
+      { id: 9, companyId: 10, companyName: 'Sunrich Companies', name: 'Ashford Centre' },
+    ], timestamp: '' });
+    http.expectOne((r) => r.url.endsWith('/buildings')).flush({ success: true, data: [], timestamp: '' });
+    http.expectOne((r) => r.url.endsWith('/floors')).flush({ success: true, data: [], timestamp: '' });
+
+    expect(component.companyOptions().map((o) => o.value)).toEqual([10]);
   });
 
   it('loads the whole floor in a single map request and selects the first floor', async () => {
