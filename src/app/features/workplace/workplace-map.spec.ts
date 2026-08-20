@@ -56,6 +56,7 @@ describe('WorkplaceMap Component UI & Interactions', () => {
             staffOptions: () => [{ label: 'Priya Sharma', value: 55 }],
             // Company 11 is a sister concern of holding company 10.
             companyGroupIds: (id: number) => new Set(id === 10 ? [10, 11] : [id]),
+            companyAncestorIds: (id: number) => (id === 11 ? [11, 10] : [id]),
           },
         },
       ],
@@ -104,6 +105,22 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     expect(component.officeOptions().map((o) => o.label))
       .toEqual(['Head Office', 'Ashford Centre · Sunrich Logistics']);
     expect(component.filteredBuildings().map((b) => b.name)).toEqual(['Ashford Centre']);
+  });
+
+  it('[NEGATIVE] company selector omits companies with no reachable workplace records', async () => {
+    await setup();
+    fixture.detectChanges();
+    // The company endpoint is unscoped, so it offers Sunrich (10) even when the
+    // only office this user can load belongs to sister concern 11.
+    http.expectOne((r) => r.url.endsWith('/offices')).flush({ success: true, data: [
+      { id: 9, companyId: 11, companyName: 'Sunrich Logistics', name: 'Ashford Centre' },
+    ], timestamp: '' });
+    http.expectOne((r) => r.url.endsWith('/buildings')).flush({ success: true, data: [], timestamp: '' });
+    http.expectOne((r) => r.url.endsWith('/floors')).flush({ success: true, data: [], timestamp: '' });
+
+    // Company 10 survives only as the parent that rolls 11 up; an unrelated
+    // company with no workplace records would be dropped entirely.
+    expect(component.companyOptions().map((o) => o.value)).toEqual([10]);
   });
 
   it('[NEGATIVE] selecting a sister concern hides other companies offices', async () => {

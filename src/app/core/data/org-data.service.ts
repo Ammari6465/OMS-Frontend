@@ -117,6 +117,24 @@ export class OrgDataService {
   }
 
   /**
+   * The company plus every company above it in the group, up to the holding
+   * company. Lets a parent stay selectable wherever its sister concerns' records
+   * roll up to it.
+   */
+  companyAncestorIds(companyId: number): number[] {
+    const all = this.companies.snapshot();
+    const chain: number[] = [companyId];
+    const seen = new Set<number>([companyId]);
+    let current = all.find((c) => c.id === companyId)?.parentCompanyId ?? null;
+    while (current != null && !seen.has(current)) {
+      chain.push(current);
+      seen.add(current);
+      current = all.find((c) => c.id === current)?.parentCompanyId ?? null;
+    }
+    return chain;
+  }
+
+  /**
    * The company plus every company beneath it in the group, at any depth.
    * Selecting the holding company should reach the whole group's records, not
    * only the rows owned by that one legal entity.
