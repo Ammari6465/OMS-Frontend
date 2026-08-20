@@ -54,6 +54,8 @@ describe('WorkplaceMap Component UI & Interactions', () => {
             companyOptions: () => [{ label: 'Sunrich', value: 10 }],
             departmentOptions: () => [{ label: 'Finance', value: 4 }],
             staffOptions: () => [{ label: 'Priya Sharma', value: 55 }],
+            // Company 11 is a sister concern of holding company 10.
+            companyGroupIds: (id: number) => new Set(id === 10 ? [10, 11] : [id]),
           },
         },
       ],
@@ -79,6 +81,48 @@ describe('WorkplaceMap Component UI & Interactions', () => {
   }
 
   afterEach(() => { http.verify(); role = Role.SUPER_ADMIN; });
+
+  it('[POSITIVE] selecting the holding company lists its sister concerns offices too', async () => {
+    await setup();
+    fixture.detectChanges();
+    http.expectOne((r) => r.url.endsWith('/offices')).flush({ success: true, data: [
+      { id: 2, companyId: 10, companyName: 'Sunrich Companies', name: 'Head Office' },
+      { id: 9, companyId: 11, companyName: 'Sunrich Logistics', name: 'Ashford Centre' },
+    ], timestamp: '' });
+    http.expectOne((r) => r.url.endsWith('/buildings')).flush({ success: true, data: [
+      { id: 3, officeId: 9, companyId: 11, name: 'Ashford Centre' },
+    ], timestamp: '' });
+    http.expectOne((r) => r.url.endsWith('/floors')).flush({ success: true, data: [], timestamp: '' });
+
+    component.selectCompany(10);
+    http.expectOne((r) => r.url.includes('/summary')).flush({ success: true, data: {
+      totalDesks: 0, assignedDesks: 0, availableDesks: 0, unavailableDesks: 0, staffWithoutDesks: 0, utilizationPercent: 0,
+    }, timestamp: '' });
+
+    // The sister concern's office is offered, tagged with its owning company,
+    // and its building comes along rather than being filtered out.
+    expect(component.officeOptions().map((o) => o.label))
+      .toEqual(['Head Office', 'Ashford Centre · Sunrich Logistics']);
+    expect(component.filteredBuildings().map((b) => b.name)).toEqual(['Ashford Centre']);
+  });
+
+  it('[NEGATIVE] selecting a sister concern hides other companies offices', async () => {
+    await setup();
+    fixture.detectChanges();
+    http.expectOne((r) => r.url.endsWith('/offices')).flush({ success: true, data: [
+      { id: 2, companyId: 10, companyName: 'Sunrich Companies', name: 'Head Office' },
+      { id: 9, companyId: 11, companyName: 'Sunrich Logistics', name: 'Ashford Centre' },
+    ], timestamp: '' });
+    http.expectOne((r) => r.url.endsWith('/buildings')).flush({ success: true, data: [], timestamp: '' });
+    http.expectOne((r) => r.url.endsWith('/floors')).flush({ success: true, data: [], timestamp: '' });
+
+    component.selectCompany(11);
+    http.expectOne((r) => r.url.includes('/summary')).flush({ success: true, data: {
+      totalDesks: 0, assignedDesks: 0, availableDesks: 0, unavailableDesks: 0, staffWithoutDesks: 0, utilizationPercent: 0,
+    }, timestamp: '' });
+
+    expect(component.officeOptions().map((o) => o.label)).toEqual(['Ashford Centre']);
+  });
 
   it('loads the whole floor in a single map request and selects the first floor', async () => {
     await setup();

@@ -116,6 +116,26 @@ export class OrgDataService {
     return this.companies.snapshot().filter((c) => c.parentCompanyId === companyId);
   }
 
+  /**
+   * The company plus every company beneath it in the group, at any depth.
+   * Selecting the holding company should reach the whole group's records, not
+   * only the rows owned by that one legal entity.
+   */
+  companyGroupIds(companyId: number): Set<number> {
+    const all = this.companies.snapshot();
+    const ids = new Set<number>([companyId]);
+    for (let added = true; added; ) {
+      added = false;
+      for (const c of all) {
+        if (!ids.has(c.id) && c.parentCompanyId != null && ids.has(c.parentCompanyId)) {
+          ids.add(c.id);
+          added = true;
+        }
+      }
+    }
+    return ids;
+  }
+
   departmentOptions(companyId?: number | null): Option[] {
     return this.departments
       .snapshot()
