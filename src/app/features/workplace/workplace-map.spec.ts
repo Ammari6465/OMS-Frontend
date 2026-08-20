@@ -82,7 +82,14 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     }
   }
 
-  afterEach(() => { http.verify(); role = Role.SUPER_ADMIN; });
+  afterEach(() => {
+    // Opening a floor also fetches its recognised objects. Tests that are not
+    // about detection simply answer it with an empty overlay set.
+    http.match((r) => r.url.endsWith('/objects'))
+      .forEach((r) => r.flush({ success: true, data: [], timestamp: '' }));
+    http.verify();
+    role = Role.SUPER_ADMIN;
+  });
 
   it('[POSITIVE] a sister concern sees the holding company shared premises', async () => {
     await setup();
@@ -125,6 +132,41 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     }, timestamp: '' });
 
     expect(component.officeOptions().map((o) => o.label)).toEqual(['Ashford Centre']);
+  });
+
+  it('[POSITIVE] renders recognised objects and hides them by layer', async () => {
+    await setup();
+    loadHierarchy();
+    const detected = [
+      { id: 1, floorId: 7, type: 'DESK', code: 'A01', polygon: [{ x: 0.1, y: 0.1 }, { x: 0.2, y: 0.1 }, { x: 0.2, y: 0.2 }], bbox: { x: 0.1, y: 0.1, width: 0.1, height: 0.1 }, center: { x: 0.15, y: 0.15 }, rotation: 0, area: 0.005, confidence: 0.9, source: 'AUTO', version: 0 },
+      { id: 2, floorId: 7, type: 'CONFERENCE_ROOM', name: 'Conference Room A', polygon: [{ x: 0.5, y: 0.1 }, { x: 0.8, y: 0.1 }, { x: 0.8, y: 0.3 }], bbox: { x: 0.5, y: 0.1, width: 0.3, height: 0.2 }, center: { x: 0.65, y: 0.2 }, rotation: 0, area: 0.03, confidence: 0.8, source: 'AUTO', version: 0 },
+    ];
+    http.expectOne((r) => r.url.endsWith('/floors/7/objects')).flush({ success: true, data: detected, timestamp: '' });
+
+    expect(component.visibleObjects().map((o) => o.id)).toEqual([1, 2]);
+    expect(component.objectColour(component.detected()[0])).toBe('#3b82f6');
+    expect(component.objectLabel(component.detected()[1])).toBe('Conference Room A');
+    expect(component.deskCandidates()).toBe(1);
+
+    // Switching the desks layer off leaves the room visible.
+    component.toggleLayer('desks');
+    expect(component.layerVisible('desks')).toBe(false);
+    expect(component.visibleObjects().map((o) => o.id)).toEqual([2]);
+  });
+
+  it('[POSITIVE] promoting detected desks reloads the map and the overlays', async () => {
+    await setup();
+    loadHierarchy();
+    http.expectOne((r) => r.url.endsWith('/floors/7/objects')).flush({ success: true, data: [], timestamp: '' });
+
+    component.promoteDesks();
+
+    http.expectOne((r) => r.url.endsWith('/objects/promote-desks'))
+      .flush({ success: true, data: { created: 12, skipped: 0, deskIds: [] }, timestamp: '' });
+    // Both the overlay set and the desk layer are refreshed, since promotion
+    // creates real desks and stamps the detections with their new desk ids.
+    expect(http.match((r) => r.url.endsWith('/floors/7/objects')).length).toBe(1);
+    expect(http.match((r) => r.url.endsWith('/floors/7/map')).length).toBe(1);
   });
 
   it('[POSITIVE] an office on the holding company keeps every concern selectable', async () => {
