@@ -401,5 +401,93 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     expect(component.saving()).toBe(false);
     expect(event.target.value).toBe('');
   });
+
+  /**
+   * The map sets touch-action:none, so the browser's own pinch is suppressed.
+   * Without these gestures a phone has no way to zoom the plan at all.
+   */
+  describe('touch gestures', () => {
+    /** The map fills a 400px-wide element mapped onto a 0..100 viewBox. */
+    function stubSvgGeometry() {
+      const svg = (component as any).mapSvg.nativeElement as SVGSVGElement;
+      svg.createSVGPoint = () => ({ x: 0, y: 0, matrixTransform(this: any) { return { x: this.x / 4, y: this.y / 4 }; } }) as any;
+      svg.getScreenCTM = () => ({ inverse: () => ({}) }) as any;
+      return svg;
+    }
+
+    function touch(id: number, x: number, y: number) {
+      return { pointerId: id, clientX: x, clientY: y, stopPropagation() {}, currentTarget: { setPointerCapture() {} } } as any;
+    }
+
+    async function openMap() {
+      await setup();
+      loadHierarchy({ floor: { ...floor, hasPlan: true }, zones: [], desks: [] } as FloorMap);
+      http.expectOne((r) => r.url.endsWith('/floors/7/objects')).flush({ success: true, data: [], timestamp: '' });
+      http.expectOne((r) => r.url.endsWith('/floors/7/plan')).flush(new Blob(['<svg></svg>'], { type: 'image/svg+xml' }));
+      fixture.detectChanges();
+      stubSvgGeometry();
+    }
+
+    it('[POSITIVE] two fingers spreading apart zoom the map in', async () => {
+      await openMap();
+      expect(component.zoom()).toBe(1);
+
+      component.mapPointerDown(touch(1, 100, 100));
+      component.mapPointerDown(touch(2, 200, 200));
+      component.pointerMove(touch(1, 50, 50));
+      component.pointerMove(touch(2, 250, 250));
+
+      expect(component.zoom()).toBeGreaterThan(1);
+    });
+
+    it('[POSITIVE] two fingers coming together zoom the map out', async () => {
+      await openMap();
+      component.mapPointerDown(touch(1, 50, 50));
+      component.mapPointerDown(touch(2, 250, 250));
+      component.pointerMove(touch(1, 140, 140));
+      component.pointerMove(touch(2, 160, 160));
+
+      expect(component.zoom()).toBeLessThan(1);
+    });
+
+    it('[NEGATIVE] a second finger cancels the one-finger pan instead of fighting it', async () => {
+      await openMap();
+      component.mapPointerDown(touch(1, 100, 100));
+      component.pointerMove(touch(1, 140, 100));
+      const panned = component.panX();
+      expect(panned).not.toBe(0);
+
+      // Second finger down: the pan must stop tracking finger one.
+      component.mapPointerDown(touch(2, 200, 200));
+      component.pointerMove(touch(1, 300, 100));
+
+      expect((component as any).panDrag).toBeNull();
+    });
+
+    it('[NEGATIVE] lifting one finger of a pinch does not resume panning', async () => {
+      await openMap();
+      component.mapPointerDown(touch(1, 100, 100));
+      component.mapPointerDown(touch(2, 200, 200));
+      component.pointerUp(touch(2, 200, 200));
+      const held = { x: component.panX(), y: component.panY() };
+
+      component.pointerMove(touch(1, 400, 400));
+
+      expect(component.panX()).toBe(held.x);
+      expect(component.panY()).toBe(held.y);
+    });
+
+    it('keeps zoom within the same bounds as the toolbar buttons', async () => {
+      await openMap();
+      component.mapPointerDown(touch(1, 199, 199));
+      component.mapPointerDown(touch(2, 201, 201));
+      // A wildly divergent spread would otherwise scale without limit.
+      component.pointerMove(touch(1, 0, 0));
+      component.pointerMove(touch(2, 4000, 4000));
+
+      expect(component.zoom()).toBeLessThanOrEqual(4);
+      expect(component.zoom()).toBeGreaterThanOrEqual(0.5);
+    });
+  });
 });
 
