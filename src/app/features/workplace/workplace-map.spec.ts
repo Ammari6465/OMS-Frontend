@@ -87,6 +87,10 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     // about detection simply answer it with an empty overlay set.
     http.match((r) => r.url.endsWith('/objects'))
       .forEach((r) => r.flush({ success: true, data: [], timestamp: '' }));
+    // Startup also asks what the detection engines can read, so the scan button
+    // can explain itself. Answer with the SVG-only default.
+    http.match((r) => r.url.endsWith('/detection/status'))
+      .forEach((r) => r.flush({ success: true, data: { detector: 'heuristic:svg', available: true, visionConfigured: false, readableMediaTypes: ['image/svg+xml'] }, timestamp: '' }));
     http.verify();
     role = Role.SUPER_ADMIN;
   });
@@ -400,6 +404,59 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ severity: 'error', summary: 'Upload failed' }));
     expect(component.saving()).toBe(false);
     expect(event.target.value).toBe('');
+  });
+
+  /**
+   * Without this the only way to learn that a raster plan needs a vision
+   * engine is to upload one and read the error, which sends people round a
+   * loop between two formats neither of which the server can read.
+   */
+  describe('scan availability', () => {
+    function status(over: Partial<{ visionConfigured: boolean; readableMediaTypes: string[] }> = {}) {
+      http.expectOne((r) => r.url.endsWith('/detection/status')).flush({
+        success: true,
+        data: { detector: 'heuristic:svg', available: true, visionConfigured: false, readableMediaTypes: ['image/svg+xml'], ...over },
+        timestamp: '',
+      });
+    }
+
+    async function floorWithPlan(mediaType: string) {
+      await setup();
+      loadHierarchy({ floor: { ...floor, hasPlan: true, planMediaType: mediaType }, zones: [], desks: [] } as FloorMap);
+      // A floor with a plan also fetches the image itself.
+      http.expectOne((r) => r.url.endsWith('/floors/7/plan')).flush(new Blob(['x'], { type: mediaType }));
+    }
+
+    it('[NEGATIVE] blocks the scan and says why when a raster plan has no vision engine', async () => {
+      await floorWithPlan('image/png');
+      status();
+
+      expect(component.canScanPlan()).toBe(false);
+      expect(component.scanHint()).toContain('vision detection');
+    });
+
+    it('[POSITIVE] allows the scan when the engine can read the plan', async () => {
+      await floorWithPlan('image/svg+xml');
+      status();
+
+      expect(component.canScanPlan()).toBe(true);
+      expect(component.scanHint()).toBe('');
+    });
+
+    it('[POSITIVE] allows a raster scan once vision is configured', async () => {
+      await floorWithPlan('image/png');
+      status({ visionConfigured: true, readableMediaTypes: ['image/jpeg', 'image/png', 'image/svg+xml'] });
+
+      expect(component.canScanPlan()).toBe(true);
+    });
+
+    it('does not block the scan when the status call fails', async () => {
+      await floorWithPlan('image/png');
+      http.expectOne((r) => r.url.endsWith('/detection/status')).error(new ProgressEvent('offline'));
+
+      // Unknown capability must not disable a control that might work.
+      expect(component.canScanPlan()).toBe(true);
+    });
   });
 
   /**

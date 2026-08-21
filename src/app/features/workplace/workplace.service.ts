@@ -15,6 +15,8 @@ export interface PlanPoint{x:number;y:number}
 export interface DetectedObject{id:number;floorId:number;type:DetectedObjectType;name?:string;code?:string;polygon:PlanPoint[];bbox:{x:number;y:number;width:number;height:number};center:PlanPoint;rotation:number;area:number;confidence:number;ocrText?:string;source:DetectionSource;detector?:string;deskId?:number;version:number}
 export interface DetectionRun{floorId:number;detector:string;detected:number;preserved:number;objects:DetectedObject[];message:string}
 export interface DeskPromotion{created:number;skipped:number;deskIds:number[]}
+/** What recognition can read on this deployment, known before a scan is run. */
+export interface DetectionStatus{detector:string;available:boolean;visionConfigured:boolean;readableMediaTypes:string[]}
 export interface DetectedObjectEdit{id?:number;type:DetectedObjectType;name?:string|null;code?:string|null;polygon:string;rotation:number;ocrText?:string|null}
 export interface WorkplaceSearchResult{deskId:number;deskCode:string;floorId:number;zoneName?:string;staffId?:number;staffName?:string;employeeCode?:string;departmentName?:string;positionTitle?:string;telephoneExtension?:string;availability:DeskAvailability;matchedOn:string}
 export interface WorkplaceSummary{totalDesks:number;assignedDesks:number;availableDesks:number;unavailableDesks:number;staffWithoutDesks:number;utilizationPercent:number}
@@ -25,6 +27,9 @@ export interface WorkplaceSummary{totalDesks:number;assignedDesks:number;availab
  plan(id:number){return this.http.get(`${this.url}/floors/${id}/plan`,{responseType:'blob',context:skipErrorToast()})}summary(companyId?:number|null){let p=new HttpParams();if(companyId!=null)p=p.set('companyId',companyId);return this.get<WorkplaceSummary>('/summary',p)}
  // ---- floor plan recognition ----
  detectedObjects(floorId:number){return this.get<DetectedObject[]>(`/floors/${floorId}/objects`)}
+ // Reports its own failure by falling back to "nothing readable", so the
+ // generic error toast is suppressed.
+ detectionStatus(){return this.http.get<ApiResponse<DetectionStatus>>(`${this.url}/detection/status`,{context:skipErrorToast()}).pipe(map(r=>r.data))}
  detectObjects(floorId:number){return this.post<DetectionRun>(`/floors/${floorId}/detect`,{})}
  saveDetectedObjects(floorId:number,objects:DetectedObjectEdit[],removedIds:number[]=[]){return this.http.put<ApiResponse<DetectedObject[]>>(`${this.url}/floors/${floorId}/objects`,{objects,removedIds}).pipe(map(r=>r.data))}
  promoteDetectedDesks(floorId:number){return this.post<DeskPromotion>(`/floors/${floorId}/objects/promote-desks`,{})}
