@@ -1,4 +1,4 @@
-import { DecimalPipe } from '@angular/common';import { Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';import { HttpErrorResponse } from '@angular/common/http';import { Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, computed, inject, signal } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule } from '@angular/forms';import { ActivatedRoute, Router } from '@angular/router';import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';import { DialogModule } from 'primeng/dialog';import { InputTextModule } from 'primeng/inputtext';import { SelectModule } from 'primeng/select';import { TableModule } from 'primeng/table';import { TagModule } from 'primeng/tag';import { CheckboxModule } from 'primeng/checkbox';import { TextareaModule } from 'primeng/textarea';import { TooltipModule } from 'primeng/tooltip';
 import { Subject, debounceTime, distinctUntilChanged, finalize, forkJoin, of, switchMap } from 'rxjs';import { catchError } from 'rxjs/operators';import { takeUntilDestroyed } from '@angular/core/rxjs-interop';import { OrgDataService } from '../../core/data/org-data.service';import { AuthService } from '../../core/services/auth.service';import { Role } from '../../core/models/enums';import { Assignment, Building, DetectedObject, DetectedObjectType, Desk, Floor, FloorMap, Office, WorkplaceSearchResult, WorkplaceService, WorkplaceSummary, Zone } from './workplace.service';import { LAYERS, LayerKey, displayName, styleFor, toSvgPoints } from './detection-layers';
@@ -81,7 +81,10 @@ export class WorkplaceMap implements OnInit,OnDestroy{
  runDetection(){const id=this.floorId();if(!id)return;this.detecting.set(true);
   this.api.detectObjects(id).pipe(finalize(()=>this.detecting.set(false))).subscribe({
    next:run=>{this.detected.set(run.objects);const detail=run.detected?this.detectionBreakdown(run.objects):run.message;this.messages.add({severity:run.detected?'success':'warn',summary:'Floor plan scanned',detail})},
-   error:()=>undefined})}
+   // The backend explains *why* a scan could not run — an unreadable file, a
+   // format no engine can open, detection not configured. Swallowing that
+   // leaves the button looking broken, so show what it said.
+   error:(e:unknown)=>this.messages.add({severity:'error',summary:'Scan failed',detail:e instanceof HttpErrorResponse?(e.error?.message??'The floor plan could not be scanned.'):'The floor plan could not be scanned.'})})}
  promoteDesks(){const id=this.floorId();if(!id)return;
   this.api.promoteDetectedDesks(id).subscribe({next:r=>{
    this.messages.add({severity:'success',summary:'Desks created',detail:`${r.created} desks added${r.skipped?`, ${r.skipped} skipped`:''}.`});
