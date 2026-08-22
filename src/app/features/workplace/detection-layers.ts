@@ -26,6 +26,9 @@ export const TYPE_STYLES: Readonly<Record<DetectedObjectType, TypeStyle>> = {
   STORAGE: { label: 'Storage', colour: '#78716c', layer: 'rooms' },
   ZONE: { label: 'Open workspace', colour: '#8b5cf6', layer: 'zones' },
   WALKWAY: { label: 'Walkway', colour: '#94a3b8', layer: 'walkways' },
+  DOOR: { label: 'Door', colour: '#0f766e', layer: 'exits' },
+  STAIRCASE: { label: 'Staircase', colour: '#475569', layer: 'exits' },
+  ELEVATOR: { label: 'Elevator', colour: '#7c3aed', layer: 'exits' },
   EXIT: { label: 'Emergency exit', colour: '#ef4444', layer: 'exits' },
   UNKNOWN: { label: 'Unclassified', colour: '#64748b', layer: 'rooms' },
 };
@@ -35,7 +38,7 @@ export const LAYERS: ReadonlyArray<{ key: LayerKey; label: string }> = [
   { key: 'rooms', label: 'Rooms' },
   { key: 'zones', label: 'Zones' },
   { key: 'walkways', label: 'Walkways' },
-  { key: 'exits', label: 'Emergency exits' },
+  { key: 'exits', label: 'Access & exits' },
   { key: 'labels', label: 'Labels' },
   { key: 'occupancy', label: 'Occupancy' },
 ];

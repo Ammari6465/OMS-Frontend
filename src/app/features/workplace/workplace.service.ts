@@ -8,13 +8,14 @@ export interface Zone{id:number;version:number;floorId:number;name:string;code:s
 export interface Assignment{id:number;version:number;deskId:number;deskCode:string;floorId:number;floorName:string;buildingName:string;officeName:string;zoneName?:string;telephoneExtension?:string;staffId:number;staffName?:string;employeeCode?:string;departmentId?:number;departmentName?:string;positionTitle?:string;effectiveFrom:string;effectiveTo?:string;primaryAssignment:boolean;reason?:string;releaseReason?:string}
 export interface Desk{id:number;version:number;floorId:number;zoneId?:number;zoneName?:string;code:string;displayName?:string;mode:DeskMode;availability:DeskAvailability;x:number;y:number;width:number;height:number;rotation:number;capacity:number;telephoneExtension?:string;accessible:boolean;equipmentTags?:string;notes?:string;status:string;isDeleted:boolean;assignment?:Assignment}
 export interface FloorMap{floor:Floor;planUrl?:string;zones:Zone[];desks:Desk[]}
-export type DetectedObjectType='DESK'|'CABIN'|'CONFERENCE_ROOM'|'MEETING_ROOM'|'RECEPTION'|'PANTRY'|'WASHROOM'|'SERVER_ROOM'|'STORAGE'|'ZONE'|'WALKWAY'|'EXIT'|'UNKNOWN';
+export type DetectedObjectType='DESK'|'CABIN'|'CONFERENCE_ROOM'|'MEETING_ROOM'|'RECEPTION'|'PANTRY'|'WASHROOM'|'SERVER_ROOM'|'STORAGE'|'ZONE'|'WALKWAY'|'DOOR'|'STAIRCASE'|'ELEVATOR'|'EXIT'|'UNKNOWN';
 export type DetectionSource='AUTO'|'MANUAL'|'EDITED';
 /** Normalised plan coordinates: 0..1 on both axes, origin top-left. */
 export interface PlanPoint{x:number;y:number}
 export interface DetectedObject{id:number;floorId:number;type:DetectedObjectType;name?:string;code?:string;polygon:PlanPoint[];bbox:{x:number;y:number;width:number;height:number};center:PlanPoint;rotation:number;area:number;confidence:number;ocrText?:string;source:DetectionSource;detector?:string;deskId?:number;version:number}
 export interface DetectionRun{floorId:number;detector:string;detected:number;preserved:number;objects:DetectedObject[];message:string}
 export interface DeskPromotion{created:number;skipped:number;deskIds:number[]}
+export interface MapContentsClearResult{desks:number;zones:number;assignments:number;detectedObjects:number}
 /** What recognition can read on this deployment, known before a scan is run. */
 export interface DetectionStatus{detector:string;available:boolean;visionConfigured:boolean;readableMediaTypes:string[]}
 export interface DetectedObjectEdit{id?:number;type:DetectedObjectType;name?:string|null;code?:string|null;polygon:string;rotation:number;ocrText?:string|null}
@@ -31,6 +32,9 @@ export interface WorkplaceSummary{totalDesks:number;assignedDesks:number;availab
  // generic error toast is suppressed.
  detectionStatus(){return this.http.get<ApiResponse<DetectionStatus>>(`${this.url}/detection/status`,{context:skipErrorToast()}).pipe(map(r=>r.data))}
  detectObjects(floorId:number){return this.post<DetectionRun>(`/floors/${floorId}/detect`,{})}
+ cleanRescan(floorId:number){return this.post<DetectionRun>(`/floors/${floorId}/rescan`,{})}
+ clearDetectedObjects(floorId:number){return this.http.delete<ApiResponse<void>>(`${this.url}/floors/${floorId}/objects`).pipe(map(r=>r.data))}
+ clearMapContents(floorId:number){return this.http.delete<ApiResponse<MapContentsClearResult>>(`${this.url}/floors/${floorId}/contents`).pipe(map(r=>r.data))}
  saveDetectedObjects(floorId:number,objects:DetectedObjectEdit[],removedIds:number[]=[]){return this.http.put<ApiResponse<DetectedObject[]>>(`${this.url}/floors/${floorId}/objects`,{objects,removedIds}).pipe(map(r=>r.data))}
  promoteDetectedDesks(floorId:number){return this.post<DeskPromotion>(`/floors/${floorId}/objects/promote-desks`,{})}
  searchFloor(floorId:number,q:string){return this.get<WorkplaceSearchResult[]>(`/floors/${floorId}/search`,new HttpParams().set('q',q))}
@@ -39,6 +43,7 @@ export interface WorkplaceSummary{totalDesks:number;assignedDesks:number;availab
  transfer(assignmentId:number,targetDeskId:number,effectiveDate:string,reason:string){return this.post<Assignment>(`/assignments/${assignmentId}/transfer`,{targetDeskId,effectiveDate,reason})}history(staffId:number){return this.get<Assignment[]>(`/assignments/staff/${staffId}/history`)}
  saveDesks(floorId:number,desks:Desk[],removedDeskIds:number[]=[]){return this.http.put<ApiResponse<Desk[]>>(`${this.url}/floors/${floorId}/desks/batch`,{desks:desks.map(d=>({...d,zoneId:d.zoneId??null})),removedDeskIds}).pipe(map(r=>r.data))}
  uploadPlan(floorId:number,file:File){const form=new FormData();form.append('file',file);return this.http.post<ApiResponse<Floor>>(`${this.url}/floors/${floorId}/plan`,form).pipe(map(r=>r.data))}
+ removePlan(floorId:number){return this.http.delete<ApiResponse<void>>(`${this.url}/floors/${floorId}/plan`).pipe(map(r=>r.data))}
  assign(deskId:number,staffId:number,effectiveFrom:string,reason:string){return this.post<Assignment>('/assignments',{deskId,staffId,effectiveFrom,primaryAssignment:true,reason})}release(a:Assignment,effectiveTo:string,reason:string){return this.post<Assignment>(`/assignments/${a.id}/release`,{effectiveTo,reason,version:a.version})}current(staffId:number){return this.get<Assignment|null>(`/assignments/staff/${staffId}/current`)}
  archive(kind:string,id:number){return this.http.delete<ApiResponse<void>>(`${this.url}/${kind}/${id}`)}restore(kind:string,id:number){return this.http.patch<ApiResponse<void>>(`${this.url}/${kind}/${id}/restore`,{})}
  private get<T>(path:string,params?:HttpParams){return this.http.get<ApiResponse<T>>(`${this.url}${path}`,{params}).pipe(map(r=>r.data))}private post<T>(path:string,v:any){return this.http.post<ApiResponse<T>>(`${this.url}${path}`,v).pipe(map(r=>r.data))}private put<T>(path:string,v:any){return this.http.put<ApiResponse<T>>(`${this.url}${path}`,v).pipe(map(r=>r.data))}}

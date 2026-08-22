@@ -10,7 +10,7 @@ import { OrgDataService } from '../../core/data/org-data.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Role } from '../../core/models/enums';
 import { environment } from '../../../environments/environment';
-import { Desk, FloorMap } from './workplace.service';
+import { Desk, DetectedObject, FloorMap } from './workplace.service';
 
 const url = `${environment.apiUrl}/workplaces`;
 
@@ -18,6 +18,10 @@ const floor = { id: 7, version: 1, buildingId: 3, buildingName: 'Building A', of
 
 function desk(over: Partial<Desk> = {}): Desk {
   return { id: 100, version: 1, floorId: 7, code: 'F3-027', mode: 'ASSIGNED', availability: 'AVAILABLE', x: 10, y: 10, width: 4, height: 3, rotation: 0, capacity: 1, accessible: false, status: 'ACTIVE', isDeleted: false, ...over } as Desk;
+}
+
+function recognised(over: Partial<DetectedObject> = {}): DetectedObject {
+  return { id: 1, floorId: 7, type: 'DESK', code: 'A01', polygon: [{ x: 0.1, y: 0.1 }, { x: 0.2, y: 0.1 }, { x: 0.2, y: 0.2 }], bbox: { x: 0.1, y: 0.1, width: 0.1, height: 0.1 }, center: { x: 0.15, y: 0.15 }, rotation: 0, area: 0.005, confidence: 0.9, source: 'AUTO', version: 0, ...over } as DetectedObject;
 }
 
 const assignedDesk = desk({
@@ -151,11 +155,41 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     expect(component.objectColour(component.detected()[0])).toBe('#3b82f6');
     expect(component.objectLabel(component.detected()[1])).toBe('Conference Room A');
     expect(component.deskCandidates()).toBe(1);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('g.detected text')?.textContent).toContain('A01');
 
     // Switching the desks layer off leaves the room visible.
     component.toggleLayer('desks');
     expect(component.layerVisible('desks')).toBe(false);
     expect(component.visibleObjects().map((o) => o.id)).toEqual([2]);
+  });
+
+  it('[POSITIVE] edits the name, code, and type of any recognised object', async () => {
+    await setup();
+    loadHierarchy();
+    const original = recognised();
+    http.expectOne((r) => r.url.endsWith('/floors/7/objects') && r.method === 'GET')
+      .flush({ success: true, data: [original], timestamp: '' });
+
+    component.selectDesk(desk());
+    component.selectObject(original);
+    expect(component.selected()).toBeNull();
+    component.editDetectedObject(original);
+    component.detectedForm.setValue({ name: 'Priya Desk', code: 'p-01', type: 'CABIN' });
+    component.saveDetectedObject();
+
+    const request = http.expectOne((r) => r.url.endsWith('/floors/7/objects') && r.method === 'PUT');
+    expect(request.request.body).toEqual({ objects: [{
+      id: 1, type: 'CABIN', name: 'Priya Desk', code: 'P-01',
+      polygon: '0.1,0.1 0.2,0.1 0.2,0.2', rotation: 0, ocrText: null,
+    }], removedIds: [] });
+    const updated = recognised({ name: 'Priya Desk', code: 'P-01', type: 'CABIN', source: 'EDITED' });
+    request.flush({ success: true, data: [updated], timestamp: '' });
+
+    expect(component.selectedObject()?.name).toBe('Priya Desk');
+    expect(component.objectLabel(component.detected()[0])).toBe('Priya Desk');
+    expect(component.detectedEditVisible).toBe(false);
+    expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success', summary: 'Detected object updated' }));
   });
 
   it('[POSITIVE] promoting detected desks reloads the map and the overlays', async () => {
@@ -318,6 +352,28 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     component.deleteDesk();
     expect(component.removedDeskIds()).toEqual([]);
     expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ severity: 'warn' }));
+  });
+
+  it('clears every editable map record in one confirmed request while keeping the plan', async () => {
+    await setup();
+    loadHierarchy({ floor: { ...floor, hasPlan: true }, zones: [{ id: 5, name: 'Finance Zone' }], desks: [desk(), assignedDesk] } as FloorMap);
+    http.expectOne((r) => r.url.endsWith('/floors/7/plan')).flush(new Blob(['map'], { type: 'image/png' }));
+    component.editMode.set(true);
+    component.dirty.set(true);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    component.clearMapContents();
+
+    const req = http.expectOne((r) => r.url.endsWith('/floors/7/contents'));
+    expect(req.request.method).toBe('DELETE');
+    req.flush({ success: true, data: { desks: 2, zones: 1, assignments: 1, detectedObjects: 3 }, timestamp: '' });
+    http.expectOne((r) => r.url.endsWith('/summary')).flush({ success: true, data: { totalDesks: 0, assignedDesks: 0, availableDesks: 0, unavailableDesks: 0, staffWithoutDesks: 1, utilizationPercent: 0 }, timestamp: '' });
+
+    expect(component.currentMap()?.desks).toEqual([]);
+    expect(component.currentMap()?.zones).toEqual([]);
+    expect(component.dirty()).toBe(false);
+    expect(component.currentMap()?.floor.hasPlan).toBe(true);
+    expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success', summary: 'Map contents cleared' }));
   });
 
   it('discards unsaved edits by reloading the floor', async () => {
@@ -547,4 +603,3 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     });
   });
 });
-
