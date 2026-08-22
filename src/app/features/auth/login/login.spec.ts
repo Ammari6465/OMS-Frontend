@@ -20,10 +20,10 @@ describe('Login Component UI & Form Workflow', () => {
 
   const mockUser = {
     userId: 1,
-    username: 'superadmin',
-    email: 'admin@sunrichgroup.com',
+    username: 'chairman',
+    email: 'chairman@sunrichgroup.com',
     role: Role.SUPER_ADMIN,
-    fullName: 'Super Admin',
+    fullName: 'Arjun Wijesinghe',
   };
 
   beforeEach(async () => {
@@ -83,20 +83,20 @@ describe('Login Component UI & Form Workflow', () => {
   });
 
   it('[POSITIVE] fillDemo populates username and password', () => {
-    component.fillDemo('superadmin', 'Admin@12345');
-    expect(component.form.value.username).toBe('superadmin');
-    expect(component.form.value.password).toBe('Admin@12345');
+    component.fillDemo('chairman', 'Chairman@2026!');
+    expect(component.form.value.username).toBe('chairman');
+    expect(component.form.value.password).toBe('Chairman@2026!');
     expect(component.error()).toBeNull();
   });
 
   it('[POSITIVE] successful submit calls auth service and redirects to dashboard', () => {
-    component.fillDemo('superadmin', 'Admin@12345');
+    component.fillDemo('chairman', 'Chairman@2026!');
     authServiceMock.login.mockReturnValue(of(mockUser));
 
     component.submit();
 
     expect(authServiceMock.login).toHaveBeenCalledWith(
-      { username: 'superadmin', password: 'Admin@12345' },
+      { username: 'chairman', password: 'Chairman@2026!' },
       false
     );
     expect(routerMock.navigateByUrl).toHaveBeenCalledWith('/dashboard');
@@ -134,12 +134,12 @@ describe('Login Component UI & Form Workflow', () => {
   it('[POSITIVE] syncs DOM input values if autofilled by browser password manager', () => {
     const inputEl = fixture.nativeElement.querySelector('#password') as HTMLInputElement;
     if (inputEl) {
-      inputEl.value = 'Admin@12345';
+      inputEl.value = 'Chairman@2026!';
     }
 
     component.form.controls.password.setValue('');
     component.syncAutofilledValues();
 
-    expect(component.form.controls.password.value).toBe('Admin@12345');
+    expect(component.form.controls.password.value).toBe('Chairman@2026!');
   });
 });
