@@ -176,9 +176,15 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     expect(component.selected()).toBeNull();
     component.editDetectedObject(original);
     component.detectedForm.setValue({ name: 'Priya Desk', code: 'p-01', type: 'CABIN', x: 20, y: 25, width: 15, height: 12, rotation: 30 });
+    // A bulk operation may still be running, but it must not make this
+    // independent object edit wait or inherit the bulk spinner.
+    component.saving.set(true);
     component.saveDetectedObject();
 
     const request = http.expectOne((r) => r.url.endsWith('/floors/7/objects') && r.method === 'PUT');
+    expect(component.detectedEditVisible).toBe(false);
+    expect(component.selectedObject()?.name).toBe('Priya Desk');
+    expect(component.objectSaving()).toBe(true);
     expect(request.request.body).toEqual({ objects: [{
       id: 1, type: 'CABIN', name: 'Priya Desk', code: 'P-01',
       polygon: '0.2,0.25 0.35,0.25 0.35,0.37 0.2,0.37', rotation: 30, ocrText: null,
@@ -189,6 +195,8 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     expect(component.selectedObject()?.name).toBe('Priya Desk');
     expect(component.objectLabel(component.detected()[0])).toBe('Priya Desk');
     expect(component.detectedEditVisible).toBe(false);
+    expect(component.objectSaving()).toBe(false);
+    component.saving.set(false);
     expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success', summary: 'Map object updated' }));
   });
 
@@ -290,6 +298,17 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     remove.flush({ success: true, data: [], timestamp: '' });
     expect(component.detected()).toEqual([]);
     confirmDelete.mockRestore();
+  });
+
+  it('[POSITIVE] offers one Create object action instead of manual zone creation', async () => {
+    await setup();
+    loadHierarchy();
+    component.editMode.set(true);
+    fixture.detectChanges();
+
+    const labels = [...fixture.nativeElement.querySelectorAll('button')].map((button: Element) => button.textContent?.trim());
+    expect(labels).toContain('Create object');
+    expect(labels).not.toContain('Add zone');
   });
 
   it('[POSITIVE] an admin can drag a door to a new position and save it automatically', async () => {
