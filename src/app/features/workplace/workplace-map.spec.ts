@@ -175,13 +175,13 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     component.selectObject(original);
     expect(component.selected()).toBeNull();
     component.editDetectedObject(original);
-    component.detectedForm.setValue({ name: 'Priya Desk', code: 'p-01', type: 'CABIN' });
+    component.detectedForm.setValue({ name: 'Priya Desk', code: 'p-01', type: 'CABIN', x: 20, y: 25, width: 15, height: 12, rotation: 30 });
     component.saveDetectedObject();
 
     const request = http.expectOne((r) => r.url.endsWith('/floors/7/objects') && r.method === 'PUT');
     expect(request.request.body).toEqual({ objects: [{
       id: 1, type: 'CABIN', name: 'Priya Desk', code: 'P-01',
-      polygon: '0.1,0.1 0.2,0.1 0.2,0.2', rotation: 0, ocrText: null,
+      polygon: '0.2,0.25 0.35,0.25 0.35,0.37 0.2,0.37', rotation: 30, ocrText: null,
     }], removedIds: [] });
     const updated = recognised({ name: 'Priya Desk', code: 'P-01', type: 'CABIN', source: 'EDITED' });
     request.flush({ success: true, data: [updated], timestamp: '' });
@@ -189,7 +189,7 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     expect(component.selectedObject()?.name).toBe('Priya Desk');
     expect(component.objectLabel(component.detected()[0])).toBe('Priya Desk');
     expect(component.detectedEditVisible).toBe(false);
-    expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success', summary: 'Detected object updated' }));
+    expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success', summary: 'Map object updated' }));
   });
 
   it('[POSITIVE] promoting detected desks reloads the map and the overlays', async () => {
@@ -205,6 +205,72 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     // creates real desks and stamps the detections with their new desk ids.
     expect(http.match((r) => r.url.endsWith('/floors/7/objects')).length).toBe(1);
     expect(http.match((r) => r.url.endsWith('/floors/7/map')).length).toBe(1);
+  });
+
+  it('[POSITIVE] auto-build creates detected desks and rooms without another admin step', async () => {
+    await setup();
+    loadHierarchy();
+    http.expectOne((r) => r.url.endsWith('/floors/7/objects')).flush({ success: true, data: [], timestamp: '' });
+    const promoteDesks = vi.spyOn(component, 'promoteDesks').mockImplementation(() => undefined);
+    const promoteRooms = vi.spyOn(component, 'promoteRooms').mockImplementation(() => undefined);
+
+    component.runDetection(false, true);
+    const scan = http.expectOne((r) => r.url.endsWith('/floors/7/detect') && r.method === 'POST');
+    scan.flush({ success: true, data: {
+      floorId: 7, detector: 'vision', detected: 2, preserved: 0,
+      objects: [recognised(), recognised({ id: 2, type: 'MEETING_ROOM', code: 'MR-01' })],
+      message: 'Detected 2 objects.',
+    }, timestamp: '' });
+
+    expect(promoteDesks).toHaveBeenCalledOnce();
+    expect(promoteRooms).toHaveBeenCalledOnce();
+    expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Automatic map build' }));
+  });
+
+  it('[POSITIVE] an admin can manually place, name, size, and delete any facility', async () => {
+    await setup();
+    loadHierarchy();
+    http.expectOne((r) => r.url.endsWith('/floors/7/objects')).flush({ success: true, data: [], timestamp: '' });
+    component.editMode.set(true);
+    component.openManualObject();
+    component.manualObjectForm.setValue({ name: 'Main Lift', code: 'lift-01', type: 'ELEVATOR', width: 20, height: 10, rotation: 5 });
+    component.startManualObjectPlacement();
+
+    expect(component.objectPlaceMode()).toBe(true);
+    (component as any).placeManualObject({ x: 50, y: 50 });
+    const create = http.expectOne((r) => r.url.endsWith('/floors/7/objects') && r.method === 'PUT');
+    expect(create.request.body).toEqual({ objects: [{
+      type: 'ELEVATOR', name: 'Main Lift', code: 'LIFT-01',
+      polygon: '0.4,0.45 0.6,0.45 0.6,0.55 0.4,0.55', rotation: 5, ocrText: null,
+    }], removedIds: [] });
+    const lift = recognised({ id: 44, type: 'ELEVATOR', name: 'Main Lift', code: 'LIFT-01', source: 'MANUAL' });
+    create.flush({ success: true, data: [lift], timestamp: '' });
+
+    expect(component.selectedObject()?.id).toBe(44);
+    expect(component.objectPlaceMode()).toBe(false);
+    const confirmDelete = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    component.deleteDetectedObject(lift);
+    const remove = http.expectOne((r) => r.url.endsWith('/floors/7/objects') && r.method === 'PUT');
+    expect(remove.request.body).toEqual({ objects: [], removedIds: [44] });
+    remove.flush({ success: true, data: [], timestamp: '' });
+    expect(component.detected()).toEqual([]);
+    confirmDelete.mockRestore();
+  });
+
+  it('[POSITIVE] does not recreate a detected room that is already a zone', async () => {
+    await setup();
+    loadHierarchy();
+    const room = recognised({ id: 9, type: 'MEETING_ROOM', code: 'MR1' });
+    http.expectOne((r) => r.url.endsWith('/floors/7/objects'))
+      .flush({ success: true, data: [room], timestamp: '' });
+    component.currentMap.update((map) => map ? ({
+      ...map,
+      zones: [...map.zones, { id: 99, version: 1, floorId: 7, name: 'Meeting room', code: 'MR1', colour: '#14b8a6', status: 'ACTIVE', isDeleted: false }],
+    }) : map);
+
+    expect(component.roomCandidates()).toBe(0);
+    component.promoteRooms();
+    http.expectNone((r) => r.url.endsWith('/zones') && r.method === 'POST');
   });
 
   it('[POSITIVE] an office on the holding company keeps every concern selectable', async () => {
