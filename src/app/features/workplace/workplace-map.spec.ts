@@ -192,6 +192,41 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success', summary: 'Map object updated' }));
   });
 
+  it('[POSITIVE] lets an admin rename a desk and shows that name on the map', async () => {
+    await setup();
+    loadHierarchy();
+    const target = component.currentMap()!.desks[0];
+
+    component.editDesk(target);
+    component.deskForm.patchValue({ displayName: 'Priya Window Desk' });
+    component.applyDeskForm();
+
+    const renamed = component.currentMap()!.desks[0];
+    expect(renamed.displayName).toBe('Priya Window Desk');
+    expect(component.deskMapLabel(renamed)).toBe('Priya Window…');
+    expect(component.deskAria(renamed)).toContain('Priya Window Desk');
+    expect(component.dirty()).toBe(true);
+  });
+
+  it('[POSITIVE] generates the required zone code instead of sending an invalid request', async () => {
+    await setup();
+    loadHierarchy();
+    component.openEntity('zone');
+    component.entityForm.controls.name.setValue('Main Walkway');
+    component.onEntityNameInput();
+
+    expect(component.entityForm.controls.code.value).toBe('MAIN-WALKWAY');
+    expect(component.canCreateEntity()).toBe(true);
+    const reload = vi.spyOn(component, 'loadHierarchy').mockImplementation(() => undefined);
+    component.createEntity();
+    const create = http.expectOne((r) => r.url.endsWith('/zones') && r.method === 'POST');
+    expect(create.request.body).toEqual({ floorId: 7, name: 'Main Walkway', code: 'MAIN-WALKWAY', colour: '#64748b', status: 'ACTIVE' });
+    create.flush({ success: true, data: { id: 66, floorId: 7, name: 'Main Walkway', code: 'MAIN-WALKWAY', colour: '#64748b' }, timestamp: '' });
+
+    expect(component.entityVisible).toBe(false);
+    expect(reload).toHaveBeenCalledOnce();
+  });
+
   it('[POSITIVE] promoting detected desks reloads the map and the overlays', async () => {
     await setup();
     loadHierarchy();
@@ -255,6 +290,33 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     remove.flush({ success: true, data: [], timestamp: '' });
     expect(component.detected()).toEqual([]);
     confirmDelete.mockRestore();
+  });
+
+  it('[POSITIVE] an admin can drag a door to a new position and save it automatically', async () => {
+    await setup();
+    loadHierarchy();
+    const door = recognised({ id: 55, type: 'DOOR', name: 'Main Door' });
+    http.expectOne((r) => r.url.endsWith('/floors/7/objects')).flush({ success: true, data: [door], timestamp: '' });
+    component.editMode.set(true);
+    (component as any).point = vi.fn()
+      .mockReturnValueOnce({ x: 10, y: 10 })
+      .mockReturnValueOnce({ x: 20, y: 25 });
+    const event = { pointerId: 1, clientX: 0, clientY: 0, stopPropagation() {}, currentTarget: { setPointerCapture() {} } } as any;
+
+    component.detectedPointerDown(event, door);
+    component.pointerMove(event);
+    component.pointerUp(event);
+
+    const saveMove = http.expectOne((r) => r.url.endsWith('/floors/7/objects') && r.method === 'PUT');
+    expect(saveMove.request.body).toEqual({ objects: [{
+      id: 55, type: 'DOOR', name: 'Main Door', code: 'A01',
+      polygon: '0.2,0.25 0.3,0.25 0.3,0.35', rotation: 0, ocrText: null,
+    }], removedIds: [] });
+    const movedDoor = recognised({ id: 55, type: 'DOOR', name: 'Main Door', polygon: [{ x: .2, y: .25 }, { x: .3, y: .25 }, { x: .3, y: .35 }], bbox: { x: .2, y: .25, width: .1, height: .1 }, center: { x: .25, y: .3 }, source: 'EDITED' });
+    saveMove.flush({ success: true, data: [movedDoor], timestamp: '' });
+
+    expect(component.selectedObject()?.center).toEqual({ x: .25, y: .3 });
+    expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Object moved' }));
   });
 
   it('[POSITIVE] does not recreate a detected room that is already a zone', async () => {
