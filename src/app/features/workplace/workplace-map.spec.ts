@@ -17,7 +17,7 @@ const url = `${environment.apiUrl}/workplaces`;
 /** Reload chains are a few levels deep; this bounds the drain in afterEach. */
 const DRAIN_PASSES = 6;
 
-const floor = { id: 7, version: 1, buildingId: 3, buildingName: 'Building A', officeId: 2, officeName: 'Head Office', companyId: 10, companyName: 'Sunrich', name: 'Floor 3', displayOrder: 3, hasPlan: false, status: 'ACTIVE', isDeleted: false };
+const floor = { id: 7, version: 1, buildingId: 3, buildingName: 'Building A', officeId: 2, officeName: 'Head Office', companyId: 10, companyName: 'Sunrich', name: 'Floor 3', displayOrder: 3, hasPlan: false, mapRevision: 4, status: 'ACTIVE', isDeleted: false };
 
 function desk(over: Partial<Desk> = {}): Desk {
   return { id: 100, version: 1, floorId: 7, code: 'F3-027', mode: 'ASSIGNED', availability: 'AVAILABLE', x: 10, y: 10, width: 4, height: 3, rotation: 0, capacity: 1, accessible: false, status: 'ACTIVE', isDeleted: false, ...over } as Desk;
@@ -382,9 +382,9 @@ describe('WorkplaceMap Component UI & Interactions', () => {
   it('[POSITIVE] does not offer a detected room that is already promoted', async () => {
     await setup();
     loadHierarchy();
-    // The server marks a promoted room with the zone it became; that, not a
+    // The server marks a promoted room with the space it became; that, not a
     // code match, is what keeps it from being offered again.
-    const promoted = recognised({ id: 9, type: 'MEETING_ROOM', code: 'MR1', zoneId: 99 });
+    const promoted = recognised({ id: 9, type: 'MEETING_ROOM', code: 'MR1', spaceId: 99 });
     http.expectOne((r) => r.url.endsWith('/floors/7/objects'))
       .flush({ success: true, data: [promoted], timestamp: '' });
 
@@ -587,6 +587,60 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     expect(component.hasUnsavedChanges()).toBe(true);
   });
 
+  it('restores the removed-desk list when a deletion is undone', async () => {
+    await setup();
+    loadHierarchy();
+    component.editMode.set(true);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    component.selectDesk(component.currentMap()!.desks.find((d) => d.id === 100)!);
+    component.deleteDesk();
+    expect(component.removedDeskIds()).toEqual([100]);
+    expect(component.currentMap()!.desks.map((d) => d.id)).not.toContain(100);
+    component.undo();
+    // Undo must take the desk back out of removedDeskIds, not only restore the array.
+    expect(component.removedDeskIds()).toEqual([]);
+    expect(component.currentMap()!.desks.map((d) => d.id)).toContain(100);
+  });
+
+  it('warns before switching floor while the map has unsaved changes, and cancel keeps the floor', async () => {
+    await setup();
+    loadHierarchy();
+    component.dirty.set(true);
+    component.onFloorChange(99);
+    expect(component.unsavedVisible()).toBe(true);
+    http.expectNone((r) => r.url.endsWith('/floors/99/map'));
+    component.unsavedCancel();
+    expect(component.unsavedVisible()).toBe(false);
+    expect(component.floorId()).toBe(7);
+  });
+
+  it('discards unsaved edits and proceeds when the user chooses discard', async () => {
+    await setup();
+    loadHierarchy();
+    component.dirty.set(true);
+    component.removedDeskIds.set([100]);
+    component.onFloorChange(7);
+    expect(component.unsavedVisible()).toBe(true);
+    component.unsavedDiscard();
+    expect(component.dirty()).toBe(false);
+    expect(component.removedDeskIds()).toEqual([]);
+  });
+
+  it('sends the map revision and raises the conflict dialog when a save is rejected as stale', async () => {
+    await setup();
+    loadHierarchy();
+    component.editMode.set(true);
+    component.dirty.set(true);
+    component.save();
+    const req = http.expectOne((r) => r.url.endsWith('/floors/7/desks/batch'));
+    expect(req.request.body.mapRevision).toBe(4);
+    req.flush({ success: false, message: 'The floor map changed', timestamp: '' }, { status: 409, statusText: 'Conflict' });
+    expect(component.conflictVisible()).toBe(true);
+    component.reloadAfterConflict();
+    http.expectOne((r) => r.url.endsWith('/floors/7/map')).flush({ success: true, data: { floor, zones: [], desks: [] }, timestamp: '' });
+    expect(component.conflictVisible()).toBe(false);
+  });
+
   it('assigns a desk and refreshes the map and summary', async () => {
     await setup();
     loadHierarchy();
@@ -751,8 +805,8 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     });
 
     it('[POSITIVE] a room already promoted is not offered again', async () => {
-      // zoneId set means the server already made this room a zone.
-      await floorWithRoom([{ ...cabin, zoneId: 55 }]);
+      // spaceId set means the server already made this room a typed space.
+      await floorWithRoom([{ ...cabin, spaceId: 55 }]);
       expect(component.roomCandidates()).toBe(0);
     });
 
@@ -897,6 +951,53 @@ describe('WorkplaceMap Component UI & Interactions', () => {
       component.deleteRoom(financeZone as any);
 
       http.expectNone((r) => r.url.endsWith('/workplaces/zones/5'));
+    });
+  });
+
+  describe('spaces (Phase 2 typed rooms)', () => {
+    const cabinSpace = {
+      id: 61, version: 2, floorId: 7, type: 'CABIN', name: 'Director Cabin', code: 'C1',
+      polygon: [{ x: 0.6, y: 0.1 }, { x: 0.8, y: 0.1 }, { x: 0.8, y: 0.3 }, { x: 0.6, y: 0.3 }],
+      bbox: { x: 0.6, y: 0.1, width: 0.2, height: 0.2 }, rotation: 0, capacity: 4,
+      colour: '#8b5cf6', bookable: false, accessible: false, deskCount: 3, status: 'ACTIVE', isDeleted: false,
+    };
+
+    it('lists typed spaces with their real type, desk count and geometry', async () => {
+      await setup();
+      loadHierarchy({ floor: floor as any, zones: [], spaces: [cabinSpace], desks: [] } as any);
+      expect(component.spaces().map((s) => s.name)).toEqual(['Director Cabin']);
+      expect(component.spaces()[0].type).toBe('CABIN');
+      expect(component.spaceTypeLabel('CABIN')).toBe('Cabin');
+      expect(component.spaces()[0].deskCount).toBe(3);
+      // Geometry is the space's own, not re-derived from a scan overlay.
+      expect(component.spacePoints(cabinSpace as any)).toContain('60,10');
+    });
+
+    it('[POSITIVE] an admin can edit a space without touching the desk batch', async () => {
+      await setup();
+      loadHierarchy({ floor: floor as any, zones: [], spaces: [cabinSpace], desks: [] } as any);
+      component.editSpace(cabinSpace as any);
+      component.spaceForm.patchValue({ name: 'Board Room', type: 'CONFERENCE_ROOM', capacity: 8, bookable: true });
+
+      component.saveSpace();
+
+      const req = http.expectOne((r) => r.url.endsWith('/workplaces/spaces/61') && r.method === 'PUT');
+      expect(req.request.body).toMatchObject({ name: 'Board Room', type: 'CONFERENCE_ROOM', capacity: 8, bookable: true, version: 2 });
+      req.flush({ success: true, data: { ...cabinSpace, name: 'Board Room' }, timestamp: '' });
+      expect(component.spaceEditVisible).toBe(false);
+      expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Space updated' }));
+    });
+
+    it('[POSITIVE] an admin can delete a space', async () => {
+      await setup();
+      loadHierarchy({ floor: floor as any, zones: [], spaces: [cabinSpace], desks: [] } as any);
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      component.deleteSpace(cabinSpace as any);
+
+      http.expectOne((r) => r.url.endsWith('/workplaces/spaces/61') && r.method === 'DELETE')
+        .flush({ success: true, data: null, timestamp: '' });
+      expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Space deleted' }));
     });
   });
 

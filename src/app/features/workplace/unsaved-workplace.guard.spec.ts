@@ -26,4 +26,14 @@ describe('unsavedWorkplaceGuard', () => {
     expect(run(true)).toBe(true);
     confirm.mockRestore();
   });
+
+  it('prefers the in-app Save/Discard/Cancel dialog when the component provides one', async () => {
+    const confirm = vi.spyOn(window, 'confirm');
+    const confirmDeactivate = vi.fn().mockResolvedValue(true);
+    const result = (unsavedWorkplaceGuard as any)({ hasUnsavedChanges: () => true, confirmDeactivate });
+    await expect(result).resolves.toBe(true);
+    expect(confirmDeactivate).toHaveBeenCalled();
+    expect(confirm).not.toHaveBeenCalled();
+    confirm.mockRestore();
+  });
 });

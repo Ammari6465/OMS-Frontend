@@ -43,7 +43,7 @@ type Kind='offices'|'buildings'|'floors'|'zones'|'desks';
    @if(tab()==='zones'||tab()==='desks'){<label>Floor *<p-select formControlName="parentId" [options]="floorOptions()" optionLabel="label" optionValue="value" appendTo="body"/></label>}
    <label>Name *<input pInputText formControlName="name" required/></label>
    @if(tab()!=='floors'){<label>Code *<input pInputText formControlName="code" required/></label>}
-   @if(tab()==='offices'){<label>City<input pInputText formControlName="city"/></label><label>Country<input pInputText formControlName="country"/></label><label>Time zone *<input pInputText formControlName="timeZone" placeholder="Asia/Calcutta"/></label><label>Address<textarea pTextarea formControlName="address" rows="2"></textarea></label>}
+   @if(tab()==='offices'){<label>City<input pInputText formControlName="city"/></label><label>Country<input pInputText formControlName="country"/></label><label>Time zone *<input pInputText formControlName="timeZone" placeholder="Asia/Kolkata"/></label><label>Address<textarea pTextarea formControlName="address" rows="2"></textarea></label>}
    @if(tab()==='floors'){<label>Display order<input pInputText type="number" formControlName="displayOrder"/></label>}
    @if(tab()==='zones'){<label>Colour<input type="color" formControlName="colour"/></label>}
    @if(tab()==='desks'){<label>Telephone extension<input pInputText formControlName="telephoneExtension"/></label><label class="check"><p-checkbox formControlName="accessible" [binary]="true"/> Accessible desk</label>}
@@ -83,7 +83,7 @@ export class WorkplaceAdmin implements OnInit{
  readonly buildingOptions=computed(()=>this.buildings().filter(b=>!b.isDeleted&&(this.officeFilter()==null||b.officeId===this.officeFilter())).map(b=>({label:b.name,value:b.id})));
  readonly floorOptions=computed(()=>this.floors().filter(f=>!f.isDeleted&&(this.buildingFilter()==null||f.buildingId===this.buildingFilter())).map(f=>({label:`${f.officeName} · ${f.buildingName} · ${f.name}`,value:f.id})));
 
- readonly form=this.fb.nonNullable.group({companyId:null as number|null,parentId:null as number|null,name:'',code:'',city:'',country:'',timeZone:'Asia/Calcutta',address:'',displayOrder:0,colour:'#64748b',telephoneExtension:'',accessible:false,status:'ACTIVE'});
+ readonly form=this.fb.nonNullable.group({companyId:null as number|null,parentId:null as number|null,name:'',code:'',city:'',country:'',timeZone:'Asia/Kolkata',address:'',displayOrder:0,colour:'#64748b',telephoneExtension:'',accessible:false,status:'ACTIVE'});
 
  ngOnInit(){const initial=this.route.snapshot.data['tab'] as Tab|undefined;if(initial)this.tab.set(initial);this.load()}
 
@@ -133,7 +133,7 @@ export class WorkplaceAdmin implements OnInit{
 
  openCreate(){
   this.editingId.set(null);this.editingVersion=0;this.editingDesk=null;this.formError.set(null);
-  this.form.reset({companyId:this.companyFilter()??this.auth.currentUser()?.companyId??null,parentId:this.defaultParent(),name:'',code:'',city:'',country:'',timeZone:'Asia/Calcutta',address:'',displayOrder:this.floors().length,colour:'#64748b',telephoneExtension:'',accessible:false,status:'ACTIVE'});
+  this.form.reset({companyId:this.companyFilter()??this.auth.currentUser()?.companyId??null,parentId:this.defaultParent(),name:'',code:'',city:'',country:'',timeZone:'Asia/Kolkata',address:'',displayOrder:this.floors().length,colour:'#64748b',telephoneExtension:'',accessible:false,status:'ACTIVE'});
   this.formVisible=true;
  }
  private defaultParent():number|null{switch(this.tab()){case'buildings':return this.officeFilter()??this.officeOptions()[0]?.value??null;case'floors':return this.buildingFilter()??this.buildingOptions()[0]?.value??null;case'zones':case'desks':return this.floorOptions()[0]?.value??null;default:return null}}
@@ -145,7 +145,7 @@ export class WorkplaceAdmin implements OnInit{
    companyId:raw.companyId??null,
    parentId:this.tab()==='buildings'?raw.officeId:this.tab()==='floors'?raw.buildingId:(this.tab()==='zones'||this.tab()==='desks')?raw.floorId:null,
    name:this.tab()==='desks'?(raw.displayName||raw.code):raw.name,code:raw.code??'',
-   city:raw.city??'',country:raw.country??'',timeZone:raw.timeZone??'Asia/Calcutta',address:raw.address??'',
+   city:raw.city??'',country:raw.country??'',timeZone:raw.timeZone??'Asia/Kolkata',address:raw.address??'',
    displayOrder:raw.displayOrder??0,colour:raw.colour??'#64748b',telephoneExtension:raw.telephoneExtension??'',accessible:raw.accessible??false,status:raw.status??'ACTIVE'});
   this.formVisible=true;
  }
