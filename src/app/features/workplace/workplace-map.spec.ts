@@ -200,6 +200,29 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ severity: 'success', summary: 'Map object updated' }));
   });
 
+  it('[POSITIVE] keeps a saved Walkway when an older background reload finishes later', async () => {
+    await setup();
+    loadHierarchy();
+    const walkway = recognised({ id: 77, type: 'WALKWAY', name: undefined, code: undefined, bbox: { x: .47159, y: .45991, width: .05, height: .16 } });
+    http.expectOne((r) => r.url.endsWith('/floors/7/objects')).flush({ success: true, data: [walkway], timestamp: '' });
+    // This GET starts before the edit and represents the stale response that
+    // previously replaced a successful PUT on a busy map.
+    (component as any).loadDetected(7);
+    const staleReload = http.expectOne((r) => r.url.endsWith('/floors/7/objects') && r.method === 'GET');
+
+    component.editDetectedObject(walkway);
+    component.detectedForm.setValue({ name: 'Walkway', code: '', type: 'WALKWAY', x: 47.159, y: 45.991, width: 5, height: 16, rotation: 0 });
+    component.saveDetectedObject();
+    const save = http.expectOne((r) => r.url.endsWith('/floors/7/objects') && r.method === 'PUT');
+    expect(save.request.body.objects[0].code).toBe('WALKWAY');
+    const saved = recognised({ ...walkway, name: 'Walkway', code: 'WALKWAY', source: 'EDITED' });
+    save.flush({ success: true, data: [saved], timestamp: '' });
+    staleReload.flush({ success: true, data: [walkway], timestamp: '' });
+
+    expect(component.detected()[0].name).toBe('Walkway');
+    expect(component.detected()[0].code).toBe('WALKWAY');
+  });
+
   it('[POSITIVE] lets an admin rename a desk and shows that name on the map', async () => {
     await setup();
     loadHierarchy();
