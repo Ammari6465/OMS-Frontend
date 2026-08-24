@@ -14,6 +14,9 @@ import { Desk, DetectedObject, FloorMap } from './workplace.service';
 
 const url = `${environment.apiUrl}/workplaces`;
 
+/** Reload chains are a few levels deep; this bounds the drain in afterEach. */
+const DRAIN_PASSES = 6;
+
 const floor = { id: 7, version: 1, buildingId: 3, buildingName: 'Building A', officeId: 2, officeName: 'Head Office', companyId: 10, companyName: 'Sunrich', name: 'Floor 3', displayOrder: 3, hasPlan: false, status: 'ACTIVE', isDeleted: false };
 
 function desk(over: Partial<Desk> = {}): Desk {
@@ -95,6 +98,21 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     // can explain itself. Answer with the SVG-only default.
     http.match((r) => r.url.endsWith('/detection/status'))
       .forEach((r) => r.flush({ success: true, data: { detector: 'heuristic:svg', available: true, visionConfigured: false, readableMediaTypes: ['image/svg+xml'] }, timestamp: '' }));
+    // An action that changes the floor reloads it and the hierarchy, and each
+    // reload asks for more in turn, so a fixed list cannot catch them all.
+    // Drain whatever the action set off; assertions have already run by here.
+    for (let pass = 0; pass < DRAIN_PASSES; pass++) {
+      const open = http.match(() => true);
+      if (!open.length) break;
+      open.forEach((r) => {
+        const url = r.request.url;
+        if (url.endsWith('/floors/7/map')) r.flush({ success: true, data: { floor, zones: [], desks: [] }, timestamp: '' });
+        else if (url.endsWith('/workplaces/floors')) r.flush({ success: true, data: [floor], timestamp: '' });
+        else if (url.endsWith('/plan')) r.flush(new Blob(['x'], { type: 'image/svg+xml' }));
+        else if (url.includes('/summary')) r.flush({ success: true, data: { totalDesks: 0, assignedDesks: 0, availableDesks: 0, unavailableDesks: 0, staffWithoutDesks: 0, utilizationPercent: 0 }, timestamp: '' });
+        else r.flush({ success: true, data: [], timestamp: '' });
+      });
+    }
     http.verify();
     role = Role.SUPER_ADMIN;
   });
@@ -696,6 +714,96 @@ describe('WorkplaceMap Component UI & Interactions', () => {
       http.expectOne((r) => r.url.endsWith('/floors/7/map'))
         .flush({ success: true, data: { floor, zones: [], desks: [] }, timestamp: '' });
       expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Floor map saved' }));
+    });
+  });
+
+  /**
+   * Creating rooms did nothing at all — not even a failed request. The guard
+   * was the shared `saving` flag, which a plan upload, a map save, a clear or
+   * a map delete all raise, so an unrelated operation silently swallowed the
+   * click and the button gave no sign it had been ignored.
+   */
+  describe('creating rooms from recognised objects', () => {
+    const cabin = {
+      id: 701, floorId: 7, type: 'CABIN', name: 'Director Cabin', code: 'CB8',
+      polygon: [{ x: 0.6, y: 0.8 }, { x: 0.7, y: 0.8 }, { x: 0.7, y: 0.9 }, { x: 0.6, y: 0.9 }],
+      bbox: { x: 0.6, y: 0.8, width: 0.1, height: 0.1 }, center: { x: 0.65, y: 0.85 },
+      rotation: 0, area: 0.01, confidence: 0.9, source: 'AUTO', version: 1,
+    } as any;
+
+    async function floorWithRoom() {
+      await setup();
+      loadHierarchy({ floor: floor as any, zones: [], desks: [] });
+      http.expectOne((r) => r.url.endsWith('/floors/7/objects')).flush({ success: true, data: [cabin], timestamp: '' });
+    }
+
+    it('[POSITIVE] creates a zone for each recognised room', async () => {
+      await floorWithRoom();
+      expect(component.roomCandidates()).toBe(1);
+
+      component.promoteRooms();
+
+      const req = http.expectOne((r) => r.url.endsWith('/workplaces/zones') && r.method === 'POST');
+      expect(req.request.body).toMatchObject({ floorId: 7, name: 'Director Cabin', code: 'CB8' });
+      req.flush({ success: true, data: { id: 55 }, timestamp: '' });
+      expect(component.promotingRooms()).toBe(false);
+      expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Rooms created' }));
+    });
+
+    it('[NEGATIVE] an unrelated save in progress no longer swallows the click', async () => {
+      await floorWithRoom();
+      // A plan upload or map save raises this shared flag.
+      component.saving.set(true);
+
+      component.promoteRooms();
+
+      http.expectOne((r) => r.url.endsWith('/workplaces/zones') && r.method === 'POST')
+        .flush({ success: true, data: { id: 55 }, timestamp: '' });
+      component.saving.set(false);
+    });
+
+    it('[NEGATIVE] a second click while creating is ignored', async () => {
+      await floorWithRoom();
+      component.promoteRooms();
+
+      component.promoteRooms();
+
+      // Exactly one request, not two.
+      http.expectOne((r) => r.url.endsWith('/workplaces/zones') && r.method === 'POST')
+        .flush({ success: true, data: { id: 55 }, timestamp: '' });
+    });
+
+    it('[POSITIVE] a failed room does not stop the rest', async () => {
+      await setup();
+      loadHierarchy({ floor: floor as any, zones: [], desks: [] });
+      http.expectOne((r) => r.url.endsWith('/floors/7/objects')).flush({
+        success: true,
+        data: [cabin, { ...cabin, id: 702, code: 'CB9', name: 'Meeting Room' }],
+        timestamp: '',
+      });
+
+      component.promoteRooms();
+      http.expectOne((r) => r.method === 'POST' && r.url.endsWith('/workplaces/zones'))
+        .flush({ success: false, message: 'clash' }, { status: 409, statusText: 'Conflict' });
+      http.expectOne((r) => r.method === 'POST' && r.url.endsWith('/workplaces/zones'))
+        .flush({ success: true, data: { id: 56 }, timestamp: '' });
+
+      expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({
+        summary: 'Rooms created', detail: expect.stringContaining('1 skipped'),
+      }));
+    });
+  });
+
+  describe('rooms section', () => {
+    it('lists the floor rooms with their desk counts', async () => {
+      await setup();
+      loadHierarchy();
+
+      const listed = component.rooms();
+      expect(listed.map((z) => z.name)).toEqual(['Finance Zone']);
+      // Only the assigned desk carries zoneId 5.
+      expect(component.deskCountInZone(5)).toBe(1);
+      expect(component.deskCountInZone(999)).toBe(0);
     });
   });
 
