@@ -790,6 +790,67 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     });
   });
 
+  /**
+   * Desks are edited on the map as a batch behind Save, but the desk list is a
+   * flat table where a single edit should persist on its own — the way the room
+   * list does — so it uses the immediate updateDesk path.
+   */
+  describe('desk list actions', () => {
+    it('[POSITIVE] editing a desk from the list saves it immediately', async () => {
+      await setup();
+      loadHierarchy();
+      const target = component.currentMap()!.desks[0];
+
+      component.editDeskInline(target);
+      expect(component.deskInline).toBe(true);
+      component.deskForm.patchValue({ displayName: 'Window Desk' });
+      component.saveDeskDetails();
+
+      const req = http.expectOne((r) => r.url.endsWith(`/workplaces/desks/${target.id}`) && r.method === 'PUT');
+      expect(req.request.body).toMatchObject({ displayName: 'Window Desk', version: target.version, x: target.x });
+      req.flush({ success: true, data: target, timestamp: '' });
+      expect(component.deskVisible).toBe(false);
+      expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Desk updated' }));
+    });
+
+    it('[NEGATIVE] refuses an inline save while the map has unsaved changes', async () => {
+      await setup();
+      loadHierarchy();
+      const target = component.currentMap()!.desks[0];
+      component.editDeskInline(target);
+      component.dirty.set(true); // a staged map edit
+
+      component.saveDeskDetails();
+
+      http.expectNone((r) => r.method === 'PUT' && r.url.includes('/desks/'));
+      expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ severity: 'warn' }));
+    });
+
+    it('[POSITIVE] deleting an unassigned desk archives it directly', async () => {
+      await setup();
+      loadHierarchy();
+      const target = component.currentMap()!.desks[0]; // desk 100, unassigned
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      component.deleteDeskRow(target);
+
+      http.expectOne((r) => r.url.endsWith(`/workplaces/desks/${target.id}`) && r.method === 'DELETE')
+        .flush({ success: true, data: null, timestamp: '' });
+      expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Desk deleted' }));
+    });
+
+    it('[NEGATIVE] refuses to delete an assigned desk before release', async () => {
+      await setup();
+      loadHierarchy();
+      const assigned = component.currentMap()!.desks.find((d) => d.assignment)!;
+
+      component.deleteDeskRow(assigned);
+
+      http.expectNone((r) => r.method === 'DELETE');
+      expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ severity: 'warn' }));
+    });
+  });
+
   describe('rooms section', () => {
     const financeZone = { id: 5, version: 1, floorId: 7, name: 'Finance Zone', code: 'FIN', colour: '#3366ff', status: 'ACTIVE', isDeleted: false };
 
