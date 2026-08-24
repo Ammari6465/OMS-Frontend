@@ -700,6 +700,51 @@ describe('WorkplaceMap Component UI & Interactions', () => {
   });
 
   /**
+   * The edit dialog stayed on screen after a successful save. The request
+   * returned 200 and the handler ran to the end, so the close had to be either
+   * a guard returning early or the flag never reaching the template.
+   */
+  describe('Edit map object dialog', () => {
+    const cabin = {
+      id: 601, floorId: 7, type: 'CABIN', name: null, code: 'CB8',
+      polygon: [{ x: 0.6, y: 0.8 }, { x: 0.7, y: 0.8 }, { x: 0.7, y: 0.9 }, { x: 0.6, y: 0.9 }],
+      bbox: { x: 0.61852, y: 0.84, width: 0.098, height: 0.145 }, center: { x: 0.66, y: 0.9 },
+      rotation: 0, area: 0.014, confidence: 0.9, source: 'AUTO', version: 1,
+    } as any;
+
+    async function openEditor() {
+      await setup();
+      loadHierarchy();
+      http.expectOne((r) => r.url.endsWith('/floors/7/objects')).flush({ success: true, data: [cabin], timestamp: '' });
+      component.editDetectedObject(cabin);
+      fixture.detectChanges();
+      expect(component.detectedEditVisible).toBe(true);
+    }
+
+    it('[POSITIVE] closes once the save succeeds', async () => {
+      await openEditor();
+
+      component.saveDetectedObject();
+      http.expectOne((r) => r.url.endsWith('/floors/7/objects') && r.method === 'PUT')
+        .flush({ success: true, data: [cabin], timestamp: '' });
+      fixture.detectChanges();
+
+      expect(component.detectedEditVisible).toBe(false);
+    });
+
+    it('[NEGATIVE] stays open when the save fails, keeping the edits', async () => {
+      await openEditor();
+
+      component.saveDetectedObject();
+      http.expectOne((r) => r.url.endsWith('/floors/7/objects') && r.method === 'PUT')
+        .flush({ success: false, message: 'nope' }, { status: 500, statusText: 'Server Error' });
+      fixture.detectChanges();
+
+      expect(component.detectedEditVisible).toBe(true);
+    });
+  });
+
+  /**
    * The toolbar deleted objects only, so a detected room could be removed from
    * the side panel alone — which reads as objects not being deletable at all.
    */
