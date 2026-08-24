@@ -12,9 +12,10 @@ export type DetectedObjectType='DESK'|'CABIN'|'CONFERENCE_ROOM'|'MEETING_ROOM'|'
 export type DetectionSource='AUTO'|'MANUAL'|'EDITED';
 /** Normalised plan coordinates: 0..1 on both axes, origin top-left. */
 export interface PlanPoint{x:number;y:number}
-export interface DetectedObject{id:number;floorId:number;type:DetectedObjectType;name?:string;code?:string;polygon:PlanPoint[];bbox:{x:number;y:number;width:number;height:number};center:PlanPoint;rotation:number;area:number;confidence:number;ocrText?:string;source:DetectionSource;detector?:string;deskId?:number;version:number}
+export interface DetectedObject{id:number;floorId:number;type:DetectedObjectType;name?:string;code?:string;polygon:PlanPoint[];bbox:{x:number;y:number;width:number;height:number};center:PlanPoint;rotation:number;area:number;confidence:number;ocrText?:string;source:DetectionSource;detector?:string;deskId?:number;zoneId?:number;version:number}
 export interface DetectionRun{floorId:number;detector:string;detected:number;preserved:number;objects:DetectedObject[];message:string}
 export interface DeskPromotion{created:number;skipped:number;deskIds:number[]}
+export interface RoomPromotion{created:number;skipped:number;zoneIds:number[]}
 export interface MapContentsClearResult{desks:number;zones:number;assignments:number;detectedObjects:number}
 /** What recognition can read on this deployment, known before a scan is run. */
 export interface DetectionStatus{detector:string;available:boolean;visionConfigured:boolean;readableMediaTypes:string[]}
@@ -37,6 +38,7 @@ export interface WorkplaceSummary{totalDesks:number;assignedDesks:number;availab
  clearMapContents(floorId:number){return this.http.delete<ApiResponse<MapContentsClearResult>>(`${this.url}/floors/${floorId}/contents`).pipe(map(r=>r.data))}
  saveDetectedObjects(floorId:number,objects:DetectedObjectEdit[],removedIds:number[]=[]){return this.http.put<ApiResponse<DetectedObject[]>>(`${this.url}/floors/${floorId}/objects`,{objects,removedIds}).pipe(map(r=>r.data))}
  promoteDetectedDesks(floorId:number){return this.post<DeskPromotion>(`/floors/${floorId}/objects/promote-desks`,{})}
+ promoteDetectedRooms(floorId:number){return this.post<RoomPromotion>(`/floors/${floorId}/objects/promote-rooms`,{})}
  searchFloor(floorId:number,q:string){return this.get<WorkplaceSearchResult[]>(`/floors/${floorId}/search`,new HttpParams().set('q',q))}
  createOffice(v:any){return this.post<Office>('/offices',v)}createBuilding(v:any){return this.post<Building>('/buildings',v)}createFloor(v:any){return this.post<Floor>('/floors',v)}createZone(v:any){return this.post<Zone>('/zones',v)}createDesk(v:any){return this.post<Desk>('/desks',v)}
  updateOffice(id:number,v:any){return this.put<Office>(`/offices/${id}`,v)}updateBuilding(id:number,v:any){return this.put<Building>(`/buildings/${id}`,v)}updateFloor(id:number,v:any){return this.put<Floor>(`/floors/${id}`,v)}updateZone(id:number,v:any){return this.put<Zone>(`/zones/${id}`,v)}updateDesk(id:number,v:any){return this.put<Desk>(`/desks/${id}`,v)}

@@ -379,20 +379,16 @@ describe('WorkplaceMap Component UI & Interactions', () => {
     expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Object moved' }));
   });
 
-  it('[POSITIVE] does not recreate a detected room that is already a zone', async () => {
+  it('[POSITIVE] does not offer a detected room that is already promoted', async () => {
     await setup();
     loadHierarchy();
-    const room = recognised({ id: 9, type: 'MEETING_ROOM', code: 'MR1' });
+    // The server marks a promoted room with the zone it became; that, not a
+    // code match, is what keeps it from being offered again.
+    const promoted = recognised({ id: 9, type: 'MEETING_ROOM', code: 'MR1', zoneId: 99 });
     http.expectOne((r) => r.url.endsWith('/floors/7/objects'))
-      .flush({ success: true, data: [room], timestamp: '' });
-    component.currentMap.update((map) => map ? ({
-      ...map,
-      zones: [...map.zones, { id: 99, version: 1, floorId: 7, name: 'Meeting room', code: 'MR1', colour: '#14b8a6', status: 'ACTIVE', isDeleted: false }],
-    }) : map);
+      .flush({ success: true, data: [promoted], timestamp: '' });
 
     expect(component.roomCandidates()).toBe(0);
-    component.promoteRooms();
-    http.expectNone((r) => r.url.endsWith('/zones') && r.method === 'POST');
   });
 
   it('[POSITIVE] an office on the holding company keeps every concern selectable', async () => {
@@ -723,6 +719,11 @@ describe('WorkplaceMap Component UI & Interactions', () => {
    * a map delete all raise, so an unrelated operation silently swallowed the
    * click and the button gave no sign it had been ignored.
    */
+  /**
+   * Rooms are now promoted by one backend call. It used to fire one createZone
+   * per room with client-guessed codes, which collided with zones an earlier
+   * run had made and reported "0 added, N skipped".
+   */
   describe('creating rooms from recognised objects', () => {
     const cabin = {
       id: 701, floorId: 7, type: 'CABIN', name: 'Director Cabin', code: 'CB8',
@@ -731,34 +732,38 @@ describe('WorkplaceMap Component UI & Interactions', () => {
       rotation: 0, area: 0.01, confidence: 0.9, source: 'AUTO', version: 1,
     } as any;
 
-    async function floorWithRoom() {
+    async function floorWithRoom(objects: any[] = [cabin]) {
       await setup();
       loadHierarchy({ floor: floor as any, zones: [], desks: [] });
-      http.expectOne((r) => r.url.endsWith('/floors/7/objects')).flush({ success: true, data: [cabin], timestamp: '' });
+      http.expectOne((r) => r.url.endsWith('/floors/7/objects')).flush({ success: true, data: objects, timestamp: '' });
     }
 
-    it('[POSITIVE] creates a zone for each recognised room', async () => {
+    it('[POSITIVE] one call promotes the recognised rooms and reports the result', async () => {
       await floorWithRoom();
       expect(component.roomCandidates()).toBe(1);
 
       component.promoteRooms();
 
-      const req = http.expectOne((r) => r.url.endsWith('/workplaces/zones') && r.method === 'POST');
-      expect(req.request.body).toMatchObject({ floorId: 7, name: 'Director Cabin', code: 'CB8' });
-      req.flush({ success: true, data: { id: 55 }, timestamp: '' });
+      const req = http.expectOne((r) => r.url.endsWith('/floors/7/objects/promote-rooms') && r.method === 'POST');
+      req.flush({ success: true, data: { created: 1, skipped: 0, zoneIds: [55] }, timestamp: '' });
       expect(component.promotingRooms()).toBe(false);
       expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Rooms created' }));
     });
 
+    it('[POSITIVE] a room already promoted is not offered again', async () => {
+      // zoneId set means the server already made this room a zone.
+      await floorWithRoom([{ ...cabin, zoneId: 55 }]);
+      expect(component.roomCandidates()).toBe(0);
+    });
+
     it('[NEGATIVE] an unrelated save in progress no longer swallows the click', async () => {
       await floorWithRoom();
-      // A plan upload or map save raises this shared flag.
-      component.saving.set(true);
+      component.saving.set(true); // a plan upload or map save raises this shared flag
 
       component.promoteRooms();
 
-      http.expectOne((r) => r.url.endsWith('/workplaces/zones') && r.method === 'POST')
-        .flush({ success: true, data: { id: 55 }, timestamp: '' });
+      http.expectOne((r) => r.url.endsWith('/floors/7/objects/promote-rooms') && r.method === 'POST')
+        .flush({ success: true, data: { created: 1, skipped: 0, zoneIds: [55] }, timestamp: '' });
       component.saving.set(false);
     });
 
@@ -768,25 +773,16 @@ describe('WorkplaceMap Component UI & Interactions', () => {
 
       component.promoteRooms();
 
-      // Exactly one request, not two.
-      http.expectOne((r) => r.url.endsWith('/workplaces/zones') && r.method === 'POST')
-        .flush({ success: true, data: { id: 55 }, timestamp: '' });
+      http.expectOne((r) => r.url.endsWith('/floors/7/objects/promote-rooms') && r.method === 'POST')
+        .flush({ success: true, data: { created: 1, skipped: 0, zoneIds: [55] }, timestamp: '' });
     });
 
-    it('[POSITIVE] a failed room does not stop the rest', async () => {
-      await setup();
-      loadHierarchy({ floor: floor as any, zones: [], desks: [] });
-      http.expectOne((r) => r.url.endsWith('/floors/7/objects')).flush({
-        success: true,
-        data: [cabin, { ...cabin, id: 702, code: 'CB9', name: 'Meeting Room' }],
-        timestamp: '',
-      });
-
+    it('reports how many were skipped', async () => {
+      await floorWithRoom();
       component.promoteRooms();
-      http.expectOne((r) => r.method === 'POST' && r.url.endsWith('/workplaces/zones'))
-        .flush({ success: false, message: 'clash' }, { status: 409, statusText: 'Conflict' });
-      http.expectOne((r) => r.method === 'POST' && r.url.endsWith('/workplaces/zones'))
-        .flush({ success: true, data: { id: 56 }, timestamp: '' });
+
+      http.expectOne((r) => r.url.endsWith('/floors/7/objects/promote-rooms'))
+        .flush({ success: true, data: { created: 2, skipped: 1, zoneIds: [55, 56] }, timestamp: '' });
 
       expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({
         summary: 'Rooms created', detail: expect.stringContaining('1 skipped'),
@@ -795,15 +791,51 @@ describe('WorkplaceMap Component UI & Interactions', () => {
   });
 
   describe('rooms section', () => {
+    const financeZone = { id: 5, version: 1, floorId: 7, name: 'Finance Zone', code: 'FIN', colour: '#3366ff', status: 'ACTIVE', isDeleted: false };
+
     it('lists the floor rooms with their desk counts', async () => {
       await setup();
       loadHierarchy();
 
-      const listed = component.rooms();
-      expect(listed.map((z) => z.name)).toEqual(['Finance Zone']);
-      // Only the assigned desk carries zoneId 5.
-      expect(component.deskCountInZone(5)).toBe(1);
+      expect(component.rooms().map((z) => z.name)).toEqual(['Finance Zone']);
+      expect(component.deskCountInZone(5)).toBe(1); // only the assigned desk carries zoneId 5
       expect(component.deskCountInZone(999)).toBe(0);
+    });
+
+    it('[POSITIVE] an admin can rename a room', async () => {
+      await setup();
+      loadHierarchy();
+      component.editRoom(financeZone as any);
+      component.roomForm.patchValue({ name: 'Treasury' });
+
+      component.saveRoom();
+
+      const req = http.expectOne((r) => r.url.endsWith('/workplaces/zones/5') && r.method === 'PUT');
+      expect(req.request.body).toMatchObject({ name: 'Treasury', version: 1 });
+      req.flush({ success: true, data: { ...financeZone, name: 'Treasury' }, timestamp: '' });
+      expect(component.roomEditVisible).toBe(false);
+    });
+
+    it('[POSITIVE] an admin can delete a room', async () => {
+      await setup();
+      loadHierarchy();
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      component.deleteRoom(financeZone as any);
+
+      http.expectOne((r) => r.url.endsWith('/workplaces/zones/5') && r.method === 'DELETE')
+        .flush({ success: true, data: null, timestamp: '' });
+      expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Room deleted' }));
+    });
+
+    it('[NEGATIVE] cancelling the delete confirm makes no request', async () => {
+      await setup();
+      loadHierarchy();
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+      component.deleteRoom(financeZone as any);
+
+      http.expectNone((r) => r.url.endsWith('/workplaces/zones/5'));
     });
   });
 
