@@ -633,6 +633,192 @@ describe('WorkplaceMap Component UI & Interactions', () => {
   });
 
   /**
+   * Save is disabled until something marks the map dirty. The existing cover
+   * for save() sets that flag by hand, so nothing proved that the actions a
+   * person actually performs reach it — a Save button that never enables is
+   * indistinguishable from one that does not work.
+   */
+  describe('Save enablement', () => {
+    function pointer(id: number, x: number, y: number) {
+      return { pointerId: id, clientX: x, clientY: y, stopPropagation() {}, currentTarget: { setPointerCapture() {} } } as any;
+    }
+
+    it('[POSITIVE] dragging a desk enables Save', async () => {
+      await setup();
+      loadHierarchy();
+      component.editMode.set(true);
+      expect(component.dirty()).toBe(false);
+
+      const target = component.currentMap()!.desks[0];
+      component.deskPointerDown(pointer(1, 0, 0), target, 'move');
+      component.pointerMove(pointer(1, 40, 40));
+
+      expect(component.dirty()).toBe(true);
+    });
+
+    it('[NEGATIVE] dragging a desk outside edit mode leaves Save disabled', async () => {
+      await setup();
+      loadHierarchy();
+      component.editMode.set(false);
+
+      const target = component.currentMap()!.desks[0];
+      component.deskPointerDown(pointer(1, 0, 0), target, 'move');
+      component.pointerMove(pointer(1, 40, 40));
+
+      expect(component.dirty()).toBe(false);
+    });
+
+    it('[POSITIVE] deleting a desk enables Save', async () => {
+      await setup();
+      loadHierarchy();
+      component.editMode.set(true);
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+      component.selectDesk(component.currentMap()!.desks[0]);
+      component.deleteDesk();
+
+      expect(component.dirty()).toBe(true);
+    });
+
+    it('[POSITIVE] Save sends the desks and clears the dirty flag', async () => {
+      await setup();
+      loadHierarchy();
+      component.editMode.set(true);
+      const target = component.currentMap()!.desks[0];
+      component.deskPointerDown(pointer(1, 0, 0), target, 'move');
+      component.pointerMove(pointer(1, 40, 40));
+
+      component.save();
+
+      const req = http.expectOne((r) => r.url.endsWith('/floors/7/desks/batch') && r.method === 'PUT');
+      expect(req.request.body.desks.length).toBeGreaterThan(0);
+      req.flush({ success: true, data: [], timestamp: '' });
+      http.expectOne((r) => r.url.endsWith('/floors/7/map'))
+        .flush({ success: true, data: { floor, zones: [], desks: [] }, timestamp: '' });
+      expect(messages.add).toHaveBeenCalledWith(expect.objectContaining({ summary: 'Floor map saved' }));
+    });
+  });
+
+  /**
+   * The toolbar deleted objects only, so a detected room could be removed from
+   * the side panel alone — which reads as objects not being deletable at all.
+   */
+  describe('deleting map objects', () => {
+    const room = {
+      id: 501, floorId: 7, type: 'CABIN', name: 'Cabin 1', code: 'C1',
+      polygon: [{ x: 0.1, y: 0.1 }, { x: 0.3, y: 0.1 }, { x: 0.3, y: 0.3 }, { x: 0.1, y: 0.3 }],
+      bbox: { x: 0.1, y: 0.1, width: 0.2, height: 0.2 }, center: { x: 0.2, y: 0.2 },
+      rotation: 0, area: 0.04, confidence: 0.9, source: 'AUTO', version: 1,
+    } as any;
+
+    async function floorWithObject() {
+      await setup();
+      loadHierarchy();
+      http.expectOne((r) => r.url.endsWith('/floors/7/objects')).flush({ success: true, data: [room], timestamp: '' });
+      component.selectObject(room);
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+    }
+
+    function press(key: string, target: EventTarget = document.body) {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'target', { value: target });
+      component.onDeleteKey(event);
+      return event;
+    }
+
+    it('[POSITIVE] the toolbar control deletes the selected object, not just desks', async () => {
+      await floorWithObject();
+
+      component.deleteSelection();
+
+      const req = http.expectOne((r) => r.url.endsWith('/floors/7/objects') && r.method === 'PUT');
+      expect(req.request.body).toEqual({ objects: [], removedIds: [501] });
+      req.flush({ success: true, data: [], timestamp: '' });
+      expect(component.detected()).toEqual([]);
+      expect(component.selectedObject()).toBeNull();
+    });
+
+    it('[POSITIVE] the Delete key removes the selected object', async () => {
+      await floorWithObject();
+
+      press('Delete');
+
+      http.expectOne((r) => r.url.endsWith('/floors/7/objects') && r.method === 'PUT')
+        .flush({ success: true, data: [], timestamp: '' });
+      expect(component.detected()).toEqual([]);
+    });
+
+    it('[NEGATIVE] the Delete key does nothing while typing in a field', async () => {
+      await floorWithObject();
+      const input = document.createElement('input');
+
+      press('Delete', input);
+
+      // Deleting a character in a name field must not delete the room.
+      http.expectNone((r) => r.method === 'PUT');
+      expect(component.selectedObject()).not.toBeNull();
+    });
+
+    it('[NEGATIVE] the Delete key does nothing while a dialog is open', async () => {
+      await floorWithObject();
+      component.deskVisible = true;
+
+      press('Delete');
+
+      http.expectNone((r) => r.method === 'PUT');
+    });
+
+    it('[NEGATIVE] a viewer without manage rights cannot delete with the keyboard', async () => {
+      role = Role.READ_ONLY;
+      await floorWithObject();
+
+      press('Delete');
+
+      http.expectNone((r) => r.method === 'PUT');
+    });
+
+    /**
+     * pointerdown and click both fire on the same element. In edit mode
+     * pointerdown selects the object, so a click that toggles would switch it
+     * straight back off — leaving nothing selected, the toolbar trash disabled
+     * and the details panel on its empty state. The object then cannot be
+     * deleted at all, which is exactly what was reported.
+     */
+    it('[NEGATIVE] a click in edit mode does not undo the selection pointerdown just made', async () => {
+      await floorWithObject();
+      component.editMode.set(true);
+      component.selectedObject.set(null);
+
+      const down = { pointerId: 1, clientX: 10, clientY: 10, stopPropagation() {}, currentTarget: { setPointerCapture() {} } } as any;
+      component.detectedPointerDown(down, room);
+      component.selectObject(room);
+
+      expect(component.selectedObject()?.id).toBe(room.id);
+      expect(component.deleteHint()).toContain('Cabin 1');
+    });
+
+    it('[POSITIVE] clicking a selected object still deselects it outside edit mode', async () => {
+      await floorWithObject();
+      component.editMode.set(false);
+      // The fixture already selected it; no pointerdown claimed it.
+      expect(component.selectedObject()?.id).toBe(room.id);
+
+      component.selectObject(room);
+
+      // Toggling stays the behaviour where only the click handler runs.
+      expect(component.selectedObject()).toBeNull();
+    });
+
+    it('names what the delete control would remove', async () => {
+      await setup();
+      loadHierarchy();
+      expect(component.deleteHint()).toContain('Select a desk or map object');
+      component.selectObject(room);
+      expect(component.deleteHint()).toContain('Cabin 1');
+    });
+  });
+
+  /**
    * Without this the only way to learn that a raster plan needs a vision
    * engine is to upload one and read the error, which sends people round a
    * loop between two formats neither of which the server can read.
