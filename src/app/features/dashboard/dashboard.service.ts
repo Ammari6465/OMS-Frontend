@@ -107,6 +107,7 @@ export class DashboardService {
   readonly kpis = computed<DashboardKpi[]>(() => {
     const n = (v: number) => v.toLocaleString();
     const companies = this.effectiveCompanyId() == null ? this.allCompanies().length : 1;
+    const canVacancies = this.auth.canViewVacancies();
     const depts = this.departments().length;
     const employees = this.staff().length;
     const active = this.activeStaff();
@@ -133,13 +134,17 @@ export class DashboardService {
 
     // Super Admin (group-wide) leads with Companies; scoped users lead with Positions.
     if (this.userCompanyId() === null && this.effectiveCompanyId() === null) {
-      return [companiesCard, deptCard, staffCard, vacancyCard];
+      return canVacancies ? [companiesCard, deptCard, staffCard, vacancyCard] : [companiesCard, deptCard, staffCard];
     }
     const positionsCard: DashboardKpi = {
       key: 'positions', label: 'Positions', value: n(this.positions().length),
       sublabel: 'Defined roles', icon: 'pi pi-id-card', color: 'var(--oms-primary)', route: '/positions',
     };
-    return [deptCard, staffCard, positionsCard, vacancyCard];
+    const list = this.auth.isAdmin() ? [deptCard, staffCard, positionsCard] : [deptCard, staffCard];
+    if (canVacancies) {
+      list.push(vacancyCard);
+    }
+    return list;
   });
 
   // ---- Workforce distribution (employees per department) ----
@@ -179,9 +184,10 @@ export class DashboardService {
 
   // ---- Pending actions (only surfaced when there is something to do) ----
   readonly pendingActions = computed<PendingAction[]>(() => {
+    const canVacancies = this.auth.canViewVacancies();
     const items: PendingAction[] = [];
     const vac = this.vacantCount();
-    if (vac) items.push({ key: 'vac', label: 'Open vacancies to fill', count: vac, icon: 'pi pi-inbox', color: '#fbbf24', route: '/vacancies' });
+    if (vac && canVacancies) items.push({ key: 'vac', label: 'Open vacancies to fill', count: vac, icon: 'pi pi-inbox', color: '#fbbf24', route: '/vacancies' });
 
     const noHead = this.departments().filter((d) => d.headStaffId == null).length;
     if (noHead) items.push({ key: 'nohead', label: 'Departments without a head', count: noHead, icon: 'pi pi-briefcase', color: '#f472b6', route: '/departments' });
@@ -211,11 +217,12 @@ export class DashboardService {
   readonly quickActions = computed<QuickAction[]>(() => {
     const admin = this.auth.canEditOrgData();
     const superAdmin = this.auth.isSuperAdmin();
+    const canVacancies = this.auth.canViewVacancies();
     return [
       { label: 'Add Company', icon: 'pi pi-building', route: '/companies', visible: superAdmin },
       { label: 'Add Department', icon: 'pi pi-briefcase', route: '/departments', visible: admin },
       { label: 'Add Employee', icon: 'pi pi-user-plus', route: '/staff', visible: admin },
-      { label: 'Manage Vacancies', icon: 'pi pi-inbox', route: '/vacancies', visible: admin },
+      { label: 'Manage Vacancies', icon: 'pi pi-inbox', route: '/vacancies', visible: canVacancies },
       { label: 'View Organogram', icon: 'pi pi-sitemap', route: '/organogram', visible: true },
       { label: 'My Profile', icon: 'pi pi-user', route: '/profile', visible: true },
     ].filter((a) => a.visible);

@@ -6,6 +6,7 @@ import { Role } from './core/models/enums';
 import { unsavedWorkplaceGuard } from './features/workplace/unsaved-workplace.guard';
 
 const ADMINS = [Role.SUPER_ADMIN, Role.COMPANY_ADMIN];
+const VACANCY_ROLES = [Role.SUPER_ADMIN, Role.COMPANY_ADMIN, Role.MANAGER];
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
@@ -76,7 +77,7 @@ export const routes: Routes = [
       },
       {
         path: 'vacancies',
-        canActivate: [roleGuard(ADMINS)],
+        canActivate: [roleGuard(VACANCY_ROLES)],
         data: { breadcrumb: 'Vacancies' },
         loadComponent: () => import('./features/vacancy/vacancy-list').then((m) => m.VacancyList),
       },

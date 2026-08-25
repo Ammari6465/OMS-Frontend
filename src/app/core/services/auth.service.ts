@@ -67,6 +67,7 @@ export class AuthService {
   readonly canEditOrgData = computed(() => this.isAdmin());
   readonly canManageUsers = computed(() => this.isAdmin());
   readonly canManageSettings = computed(() => this.isSuperAdmin());
+  readonly canViewVacancies = computed(() => this.isAdmin() || this.isManager());
 
   private readonly tokenKey = environment.tokenStorageKey;
 

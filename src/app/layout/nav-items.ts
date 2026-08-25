@@ -16,6 +16,7 @@ export interface NavSection {
 }
 
 const ADMINS = [Role.SUPER_ADMIN, Role.COMPANY_ADMIN];
+const VACANCY_ROLES = [Role.SUPER_ADMIN, Role.COMPANY_ADMIN, Role.MANAGER];
 
 /**
  * Full application information architecture. Items flagged `implemented:false`
@@ -39,7 +40,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { label: 'Departments', icon: 'pi pi-briefcase', route: '/departments', roles: ADMINS, implemented: true },
       { label: 'Staff', icon: 'pi pi-users', route: '/staff', implemented: true },
       { label: 'Positions', icon: 'pi pi-id-card', route: '/positions', roles: ADMINS, implemented: true },
-      { label: 'Vacancies', icon: 'pi pi-inbox', route: '/vacancies', roles: ADMINS, implemented: true },
+      { label: 'Vacancies', icon: 'pi pi-inbox', route: '/vacancies', roles: VACANCY_ROLES, implemented: true },
     ],
   },
   {

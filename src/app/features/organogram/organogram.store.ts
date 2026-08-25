@@ -31,6 +31,7 @@ export class OrganogramStore implements OnDestroy {
   readonly companyId = signal<number | null>(null);
   readonly view = signal<OrganogramView>('EMPLOYEE');
   readonly includeVacancies = signal(true);
+  readonly canViewVacancies = computed(() => this.auth.isAdmin() || this.auth.isManager());
   readonly departmentId = signal<number | null>(null);
   readonly search = signal('');
   readonly searchIndex = signal(0);
@@ -228,11 +229,11 @@ export class OrganogramStore implements OnDestroy {
           this.data.update((d) =>
             d
               ? {
-                  ...d,
-                  nodes: d.nodes.map((n) =>
-                    n.id === person.id ? { ...n, parentId: previous } : n,
-                  ),
-                }
+                ...d,
+                nodes: d.nodes.map((n) =>
+                  n.id === person.id ? { ...n, parentId: previous } : n,
+                ),
+              }
               : d,
           );
         },

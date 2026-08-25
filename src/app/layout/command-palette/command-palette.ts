@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { OrgDataService } from '../../core/data/org-data.service';
+import { AuthService } from '../../core/services/auth.service';
 import { Staff } from '../../core/models/organization.model';
 import { AskOmsService } from '../../shared/ai/ask-oms.service';
 
@@ -496,6 +497,7 @@ interface QuickNavigationItem {
 export class CommandPalette {
   private readonly router = inject(Router);
   readonly org = inject(OrgDataService);
+  private readonly auth = inject(AuthService);
   private readonly askOmsService = inject(AskOmsService);
 
   /** Hands the current query to the Ask OMS copilot (Smart Global Search). */
@@ -586,9 +588,20 @@ export class CommandPalette {
 
   filteredQuickNavs(): QuickNavigationItem[] {
     const searchTerm = this.normalizedQuery();
-    if (!searchTerm) return this.quickNavs();
+    const canVacancies = this.auth.canViewVacancies();
+    const isSuperAdmin = this.auth.isSuperAdmin();
+    const isAdmin = this.auth.isAdmin();
 
-    return this.quickNavs().filter((nav) =>
+    const allowed = this.quickNavs().filter((nav) => {
+      if (nav.path === '/vacancies') return canVacancies;
+      if (nav.path === '/settings') return isSuperAdmin;
+      if (nav.path === '/departments') return isAdmin;
+      return true;
+    });
+
+    if (!searchTerm) return allowed;
+
+    return allowed.filter((nav) =>
       `${nav.label} ${nav.desc} ${nav.keywords}`.toLowerCase().includes(searchTerm),
     );
   }
